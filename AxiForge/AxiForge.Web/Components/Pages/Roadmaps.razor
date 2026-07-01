@@ -1,0 +1,260 @@
+@page "/roadmaps"
+@using AxiForge.Application.DTOs.Roadmaps
+@inject AxiForge.Web.Services.AxiForgeApiClient ApiClient
+@inject AxiForge.Web.Services.AuthStateService AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>AxiForge Study Plan</PageTitle>
+
+<section class="study-plan-page">
+    <div class="study-hero">
+        <a class="study-back" href="/practice">&lt;</a>
+        <div class="study-symbol">F</div>
+        <div>
+            <p>@GetHeroSubtitle()</p>
+            <h1>@GetHeroTitle()</h1>
+            <button class="study-start" @onclick="StartPlanAsync">Start</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="study-message">@message</div>
+    }
+
+    <div class="study-content">
+        <main class="study-list">
+            <label class="show-tags">
+                <input type="checkbox" @bind="showTags" />
+                <span>Show tags</span>
+            </label>
+
+            @if (isLoading)
+            {
+                <div class="empty-state-panel">
+                    <h2>Loading study plans...</h2>
+                    <p>AxiForge is checking the database for published roadmaps.</p>
+                </div>
+            }
+            else if (roadmaps.Count == 0)
+            {
+                <div class="empty-state-panel">
+                    <h2>No study plans published yet.</h2>
+                    <p>Roadmaps created in the admin product will appear here without code changes.</p>
+                </div>
+            }
+            else
+            {
+                <section class="study-section">
+                    <header>Published Study Plans</header>
+                    @foreach (var roadmap in roadmaps)
+                    {
+                        <button class="study-problem-row study-plan-row" type="button" @onclick="() => SelectRoadmapAsync(roadmap)">
+                            <span class="circle"></span>
+                            <strong>@roadmap.Title</strong>
+                            <span class="solution">@roadmap.Level</span>
+                            <span>@roadmap.StepCount step@(roadmap.StepCount == 1 ? string.Empty : "s")</span>
+                        </button>
+                    }
+                </section>
+
+                @if (selectedRoadmapDetail?.Steps.Count > 0)
+                {
+                    <section class="study-section">
+                        <header>@selectedRoadmapDetail.Title</header>
+                        @foreach (var step in selectedRoadmapDetail.Steps.OrderBy(x => x.Order))
+                        {
+                            <div class="study-problem-row">
+                                <span class="circle"></span>
+                                <strong>@step.Title</strong>
+                                <span class="solution">@step.Description</span>
+                                <span>#@step.Order</span>
+                            </div>
+                        }
+                    </section>
+                }
+            }
+        </main>
+
+        <aside class="study-rail">
+            <section>
+                <h2>Summary</h2>
+                @if (selectedRoadmap == null)
+                {
+                    <p>Select a published study plan to see its database details.</p>
+                }
+                else
+                {
+                    <ul>
+                        <li>@selectedRoadmap.Title</li>
+                        <li>@selectedRoadmap.Level level</li>
+                        <li>@selectedRoadmap.StepCount step@(selectedRoadmap.StepCount == 1 ? string.Empty : "s")</li>
+                    </ul>
+                }
+            </section>
+
+            <section>
+                <h2>Award</h2>
+                <div class="award-row">
+                    <span class="award-icon">F</span>
+                    <div>
+                        <strong>@(selectedRoadmap?.Title ?? "AxiForge")</strong>
+                        <p>Complete the selected study plan to unlock the matching badge.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2>Related</h2>
+                @foreach (var item in roadmaps.Where(x => selectedRoadmap == null || x.Id != selectedRoadmap.Id).Take(3))
+                {
+                    <button class="related-plan" type="button" @onclick="() => SelectRoadmapAsync(item)">
+                        <span>F</span>
+                        <div>
+                            <strong>@item.Title</strong>
+                            <p>@item.Description</p>
+                        </div>
+                    </button>
+                }
+            </section>
+        </aside>
+    </div>
+</section>
+
+@code {
+    private List<RoadmapTemplateDto> roadmaps = new();
+    private RoadmapTemplateDto? selectedRoadmap;
+    private RoadmapDetailDto? selectedRoadmapDetail;
+    private bool showTags;
+    private bool isLoading = true;
+    private string message = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> OnInitializedAsync");
+        try
+        {
+            roadmaps = await ApiClient.GetRoadmapsAsync();
+            selectedRoadmap = roadmaps.FirstOrDefault();
+            if (selectedRoadmap != null)
+            {
+                selectedRoadmapDetail = await ApiClient.GetRoadmapAsync(selectedRoadmap.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> OnInitializedAsync -> {ex.Message}");
+            message = "Unable to load study plans.";
+        }
+        finally
+        {
+            isLoading = false;
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> OnInitializedAsync");
+        }
+    }
+
+    /// <summary>
+    /// Starts the selected study plan for the current student.
+    /// Returns no value because it either enrolls the student or redirects to login.
+    /// </summary>
+    private async Task StartPlanAsync()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> StartPlanAsync");
+        try
+        {
+            if (!AuthState.IsAuthenticated)
+            {
+                Navigation.NavigateTo("/login?returnUrl=/roadmaps");
+                return;
+            }
+
+            if (selectedRoadmap == null)
+            {
+                message = "No study plan is available yet.";
+                return;
+            }
+
+            var enrolled = await ApiClient.EnrollRoadmapAsync(selectedRoadmap.Id);
+            message = enrolled == null ? "Enrollment failed." : $"Started {enrolled.Title}.";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> StartPlanAsync -> {ex.Message}");
+            message = "Unable to start this study plan.";
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> StartPlanAsync");
+        }
+    }
+
+    /// <summary>
+    /// Selects a roadmap from database-backed study plan data and loads its steps.
+    /// Returns no value because the detail panel updates from component state.
+    /// </summary>
+    private async Task SelectRoadmapAsync(RoadmapTemplateDto roadmap)
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> SelectRoadmapAsync");
+        try
+        {
+            selectedRoadmap = roadmap;
+            selectedRoadmapDetail = await ApiClient.GetRoadmapAsync(roadmap.Id);
+            message = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> SelectRoadmapAsync -> {ex.Message}");
+            message = "Unable to load this study plan.";
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> SelectRoadmapAsync");
+        }
+    }
+
+    /// <summary>
+    /// Gets the selected roadmap title or a neutral empty-state title.
+    /// Returns text for the study plan hero.
+    /// </summary>
+    private string GetHeroTitle()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> GetHeroTitle");
+        try
+        {
+            return selectedRoadmap?.Title ?? "Study Plans";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> GetHeroTitle -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> GetHeroTitle");
+        }
+    }
+
+    /// <summary>
+    /// Gets summary text from selected roadmap metadata.
+    /// Returns text for the study plan hero subtitle.
+    /// </summary>
+    private string GetHeroSubtitle()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> GetHeroSubtitle");
+        try
+        {
+            return selectedRoadmap == null
+                ? "Database-driven roadmaps"
+                : $"{selectedRoadmap.StepCount} steps - {selectedRoadmap.Level}";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> GetHeroSubtitle -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Roadmaps.razor -> GetHeroSubtitle");
+        }
+    }
+}

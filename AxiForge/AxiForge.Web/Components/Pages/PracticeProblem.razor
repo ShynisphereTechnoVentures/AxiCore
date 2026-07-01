@@ -1,0 +1,394 @@
+@page "/practice/{ProblemId:guid}"
+@using AxiForge.Application.DTOs.Coding
+@inject AxiForge.Web.Services.AxiForgeApiClient ApiClient
+@inject AxiForge.Web.Services.AuthStateService AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>AxiForge Problem</PageTitle>
+
+@if (problem == null)
+{
+    <section class="forge-panel">
+        <p>Loading problem...</p>
+    </section>
+}
+else
+{
+    <section class="lc-ide-page">
+        <header class="lc-ide-topbar">
+            <a href="/roadmaps" class="lc-plan-chip">F</a>
+            <strong>@GetProblemTopic()</strong>
+            <a href="/practice" class="lc-icon-button">&lt;</a>
+            <a href="/practice" class="lc-icon-button">&gt;</a>
+            <button class="lc-run" @onclick="SubmitAsync" disabled="@isBusy">Run</button>
+            <button class="lc-submit" @onclick="SubmitAsync" disabled="@isBusy">Submit</button>
+        </header>
+
+        <div class="lc-ide-grid">
+            <aside class="lc-description-pane">
+                <div class="lc-tabs">
+                    <button class="active">Description</button>
+                    <button>Editorial</button>
+                    <button>Solutions</button>
+                    <button>Submissions</button>
+                </div>
+
+                <div class="lc-problem-scroll">
+                    <h1>@problem.Title</h1>
+                    <div class="lc-badges">
+                        <span class="@GetDifficultyClass(problem.Difficulty)">@problem.Difficulty</span>
+                        <span>@GetProblemTopic()</span>
+                        @if (!string.IsNullOrWhiteSpace(problem.Tags))
+                        {
+                            <span>@problem.Tags</span>
+                        }
+                    </div>
+                    <p>@problem.Description</p>
+
+                    @if (!string.IsNullOrWhiteSpace(problem.InputFormat))
+                    {
+                        <h2>Input Format</h2>
+                        <pre>@problem.InputFormat</pre>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(problem.OutputFormat))
+                    {
+                        <h2>Output Format</h2>
+                        <pre>@problem.OutputFormat</pre>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(problem.Examples))
+                    {
+                        <h2>Examples</h2>
+                        <pre>@problem.Examples</pre>
+                    }
+
+                    @foreach (var testCase in problem.SampleTestCases.Select((value, index) => new { value, index }))
+                    {
+                        <div class="lc-example">
+                            <strong>Sample Test Case @(testCase.index + 1):</strong>
+                            <pre>Input: @testCase.value.Input
+Output: @testCase.value.ExpectedOutput</pre>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(problem.Constraints))
+                    {
+                        <h2>Constraints</h2>
+                        <pre>@problem.Constraints</pre>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(problem.Explanation))
+                    {
+                        <h2>Explanation</h2>
+                        <pre>@problem.Explanation</pre>
+                    }
+
+                    <h2>Limits</h2>
+                    <ul class="lc-constraints">
+                        <li>Time limit: @problem.TimeLimitMilliseconds ms</li>
+                        <li>Memory limit: @problem.MemoryLimitKb KB</li>
+                        <li>Hidden tests are evaluated only during submit.</li>
+                    </ul>
+                </div>
+            </aside>
+
+            <main class="lc-code-pane">
+                <div class="lc-code-header">
+                    <strong>&lt;/&gt; Code</strong>
+                    <select value="@language" @onchange="OnLanguageChanged">
+                        <option value="local">Local</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="csharp">C#</option>
+                        <option value="python">Python</option>
+                        <option value="html">HTML/CSS</option>
+                    </select>
+                    <button @onclick="ResetCode">Reset</button>
+                </div>
+
+                <textarea class="lc-code-editor" spellcheck="false" @bind="sourceCode"></textarea>
+
+                <section class="lc-test-panel">
+                    <div class="lc-test-tabs">
+                        <strong>Testcase</strong>
+                        <strong class="active">Test Result</strong>
+                    </div>
+
+                    @if (submission != null)
+                    {
+                        <div class="@GetResultClass(submission.Status)">
+                            <strong>@submission.Status</strong>
+                            <span>@submission.PassedTests / @submission.TotalTests checks passed</span>
+                            <p>@submission.Output</p>
+                        </div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(message))
+                    {
+                        <div class="alert">@message</div>
+                    }
+                    else
+                    {
+                        <div class="lc-empty-result">You must run your code first</div>
+                    }
+                </section>
+            </main>
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter]
+    public Guid ProblemId { get; set; }
+
+    private CodingProblemDetailDto? problem;
+    private CodingSubmissionDto? submission;
+    private List<CodingSubmissionDto> submissions = new();
+    private string sourceCode = string.Empty;
+    private string language = "local";
+    private string message = string.Empty;
+    private bool isBusy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> OnInitializedAsync");
+        try
+        {
+            if (!AuthState.IsAuthenticated)
+            {
+                Navigation.NavigateTo($"/login?returnUrl=/practice/{ProblemId}");
+                return;
+            }
+
+            problem = await ApiClient.GetProblemAsync(ProblemId);
+            sourceCode = GetStarterCodeForLanguage(language);
+            await LoadSubmissionsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> OnInitializedAsync -> {ex.Message}");
+            message = "Unable to load problem.";
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> OnInitializedAsync");
+        }
+    }
+
+    /// <summary>
+    /// Submits the current source code for local Judge0-compatible evaluation.
+    /// Returns no value because it updates the result panel on the practice page.
+    /// </summary>
+    private async Task SubmitAsync()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> SubmitAsync");
+        try
+        {
+            isBusy = true;
+            message = string.Empty;
+            submission = null;
+
+            if (!AuthState.IsAuthenticated)
+            {
+                message = "Please login before submitting code.";
+                return;
+            }
+
+            submission = await ApiClient.SubmitAsync(
+                new CreateSubmissionRequestDto
+                {
+                    ProblemId = ProblemId,
+                    Language = language,
+                    SourceCode = sourceCode
+                });
+
+            if (submission == null)
+            {
+                message = "Submission failed.";
+            }
+            else
+            {
+                await LoadSubmissionsAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> SubmitAsync -> {ex.Message}");
+            message = "Submission failed.";
+        }
+        finally
+        {
+            isBusy = false;
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> SubmitAsync");
+        }
+    }
+
+    /// <summary>
+    /// Restores the starter code for the active problem.
+    /// Returns no value because it updates the editor contents in place.
+    /// </summary>
+    private void ResetCode()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> ResetCode");
+        try
+        {
+            sourceCode = GetStarterCodeForLanguage(language);
+            submission = null;
+            message = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> ResetCode -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> ResetCode");
+        }
+    }
+
+    /// <summary>
+    /// Changes the editor language and loads the matching starter code.
+    /// Returns no value because it updates the editor state.
+    /// </summary>
+    private void OnLanguageChanged(ChangeEventArgs args)
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> OnLanguageChanged");
+        try
+        {
+            language = args.Value?.ToString() ?? "local";
+            sourceCode = GetStarterCodeForLanguage(language);
+            submission = null;
+            message = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> OnLanguageChanged -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> OnLanguageChanged");
+        }
+    }
+
+    /// <summary>
+    /// Gets starter code for the selected editor language.
+    /// Returns fallback starter code when the admin has not authored a language-specific template.
+    /// </summary>
+    private string GetStarterCodeForLanguage(string selectedLanguage)
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetStarterCodeForLanguage");
+        try
+        {
+            if (problem?.StarterCodeByLanguage != null &&
+                problem.StarterCodeByLanguage.TryGetValue(selectedLanguage, out var starterCode) &&
+                !string.IsNullOrWhiteSpace(starterCode))
+            {
+                return starterCode;
+            }
+
+            return problem?.StarterCode ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetStarterCodeForLanguage -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetStarterCodeForLanguage");
+        }
+    }
+
+    /// <summary>
+    /// Loads recent submissions for the signed-in student.
+    /// Returns no value because the submission panel is driven by component state.
+    /// </summary>
+    private async Task LoadSubmissionsAsync()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> LoadSubmissionsAsync");
+        try
+        {
+            submissions = AuthState.IsAuthenticated
+                ? await ApiClient.GetMySubmissionsAsync()
+                : new List<CodingSubmissionDto>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> LoadSubmissionsAsync -> {ex.Message}");
+            submissions = new List<CodingSubmissionDto>();
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> LoadSubmissionsAsync");
+        }
+    }
+
+    /// <summary>
+    /// Gets the problem topic from database-backed problem metadata.
+    /// Returns a neutral label when the admin has not assigned a topic yet.
+    /// </summary>
+    private string GetProblemTopic()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetProblemTopic");
+        try
+        {
+            return string.IsNullOrWhiteSpace(problem?.Topic) ? "Practice" : problem.Topic;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetProblemTopic -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetProblemTopic");
+        }
+    }
+
+    /// <summary>
+    /// Builds the difficulty pill CSS class from problem metadata.
+    /// Returns a CSS class string for the description pane.
+    /// </summary>
+    private static string GetDifficultyClass(string difficulty)
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetDifficultyClass");
+        try
+        {
+            return $"lc-pill lc-difficulty-{difficulty.ToLowerInvariant()}";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetDifficultyClass -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetDifficultyClass");
+        }
+    }
+
+    /// <summary>
+    /// Builds the result CSS class from submission status.
+    /// Returns a CSS class string for accepted and failed submissions.
+    /// </summary>
+    private static string GetResultClass(string status)
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetResultClass");
+        try
+        {
+            return status.Equals("Accepted", StringComparison.OrdinalIgnoreCase)
+                ? "result-box result-accepted"
+                : "result-box result-failed";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetResultClass -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> PracticeProblem.razor -> GetResultClass");
+        }
+    }
+}

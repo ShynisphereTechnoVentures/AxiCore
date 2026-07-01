@@ -1,0 +1,97 @@
+@page "/student/modules"
+
+@using AxiPlus.Web.Models.Modules
+@using AxiPlus.Web.Services
+
+@inject ModuleApiService ModuleService
+@inject NavigationManager Navigation
+
+<div class="page-shell">
+    <div class="page-header">
+        <div>
+            <MudText Typo="Typo.h4">My Modules</MudText>
+            <MudText Typo="Typo.body2">Track modules and lesson progress</MudText>
+        </div>
+    </div>
+
+    @if (modules == null)
+   {
+        <div class="loading-state">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else
+   {
+        <MudGrid>
+            @foreach (var module in modules)
+           {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Class="surface-card pa-5">
+                        <MudStack Row="true"
+                                  Justify="Justify.SpaceBetween"
+                                  AlignItems="AlignItems.Start">
+                            <div>
+                                <MudText Typo="Typo.h6">@module.Title</MudText>
+                                <MudText Typo="Typo.body2" Class="muted-text">
+                                    @module.Description
+                                </MudText>
+                            </div>
+
+                            <MudChip T="string"
+                                     Color="@(module.IsUnlocked ? Color.Success : Color.Default)">
+                                @(module.IsUnlocked ? "Unlocked" : "Locked")
+                            </MudChip>
+                        </MudStack>
+
+                        <MudDivider Class="my-4" />
+
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.body2">Lessons</MudText>
+                                <MudText Typo="Typo.body2">@module.LessonCount</MudText>
+                            </MudStack>
+
+                            <MudProgressLinear Value="@((double)module.ProgressPercentage)"
+                                               Color="Color.Primary" />
+
+                            <MudText Typo="Typo.caption" Class="muted-text">
+                                @module.ProgressPercentage% complete
+                            </MudText>
+                        </MudStack>
+
+                        <MudButton Disabled="@(!module.IsUnlocked)"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   FullWidth="true"
+                                   Class="mt-4"
+                                   Href="@($"/student/modules/{module.ModuleId}")">
+                            Open Module
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</div>
+
+@code{
+    private List<StudentModuleModel>? modules;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        modules = await ModuleService.GetStudentModulesAsync();
+
+        if (modules == null)
+       {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        StateHasChanged();
+    }
+}

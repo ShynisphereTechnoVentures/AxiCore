@@ -1,0 +1,100 @@
+@using AxiPlus.Web.Services
+@using System.Reflection
+
+@inject AuthService AuthService
+
+<MudNavMenu Class="app-nav">
+    @if (userRole == "MainMentor" || userRole == "AssistantMentor")
+   {
+        <MudNavLink Href="/mentor/dashboard"
+                    Icon="@Icons.Material.Filled.Dashboard">
+            Mentor Workspace
+        </MudNavLink>
+    }
+    else if (userRole == "Admin" || userRole == "SuperAdmin")
+   {
+        <MudNavLink Href="/admin/dashboard"
+                    Icon="@Icons.Material.Filled.AdminPanelSettings">
+            Admin Workspace
+        </MudNavLink>
+
+        <MudNavLink Href="/modules"
+                    Icon="@Icons.Material.Filled.MenuBook">
+            Modules
+        </MudNavLink>
+
+        <MudNavLink Href="/admin/axiforge"
+                    Icon="@Icons.Material.Filled.Code">
+            AxiForge
+        </MudNavLink>
+    }
+    else
+   {
+        <MudNavLink Href="/student/dashboard"
+                    Icon="@Icons.Material.Filled.Dashboard">
+            Dashboard
+        </MudNavLink>
+
+        <MudNavLink Href="/student/modules"
+                    Icon="@Icons.Material.Filled.MenuBook">
+            My Modules
+        </MudNavLink>
+
+        <MudNavLink Href="/student/liveclasses"
+                    Icon="@Icons.Material.Filled.VideoCall">
+            Live Classes
+        </MudNavLink>
+
+        <MudNavLink Href="/student/assignments"
+                    Icon="@Icons.Material.Filled.Assignment">
+            Assignments
+        </MudNavLink>
+
+        <MudNavLink Href="/student/attendance"
+                    Icon="@Icons.Material.Filled.CalendarMonth">
+            Attendance
+        </MudNavLink>
+
+        <MudNavLink Href="/student/recordings"
+                    Icon="@Icons.Material.Filled.PlayCircle">
+            Recordings
+        </MudNavLink>
+
+        <MudNavLink Href="/student/practice"
+                    Icon="@Icons.Material.Filled.Code">
+            Practice
+        </MudNavLink>
+
+        <MudNavLink Href="/student/support"
+                    Icon="@Icons.Material.Filled.SupportAgent">
+            Support
+        </MudNavLink>
+
+        <MudNavLink Href="/student/notifications"
+                    Icon="@Icons.Material.Filled.Notifications">
+            Notifications
+        </MudNavLink>
+
+        <MudDivider Class="my-3" />
+
+        <MudNavLink Href="/student/profile"
+                    Icon="@Icons.Material.Filled.Person">
+            Profile
+        </MudNavLink>
+    }
+</MudNavMenu>
+
+@code{        
+    private string? userRole;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        userRole = await AuthService.GetRoleAsync();
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,1444 @@
+@page "/admin/dashboard"
+
+@using AxiPlus.Domain.Enums
+@using AxiPlus.Web.Models.AdminPortal
+@using AxiPlus.Web.Models.Operations
+@using AxiPlus.Web.Services
+@using MudBlazor
+@using System.Reflection
+
+@inject AdminPortalApiService AdminService
+@inject OperationsApiService OperationsService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Admin Dashboard</PageTitle>
+
+<div class="page-shell">
+    @if (dashboard == null)
+   {
+        <div class="loading-state">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else
+   {
+        <div class="page-header">
+            <div>
+                <MudText Typo="Typo.h4">Admin Workspace</MudText>
+                <MudText Typo="Typo.body2">Platform operations and configuration</MudText>
+            </div>
+
+            <div class="action-row">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           OnClick="LoadAllAsync">
+                    Refresh
+                </MudButton>
+            </div>
+        </div>
+
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Users</MudText>
+                    <MudText Class="metric-value">@dashboard.UserCount</MudText>
+                    <MudText Typo="Typo.caption" Class="muted-text">
+                        @dashboard.ActiveUserCount active
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Students</MudText>
+                    <MudText Class="metric-value">@dashboard.StudentCount</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Batches</MudText>
+                    <MudText Class="metric-value">@dashboard.BatchCount</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Open Support</MudText>
+                    <MudText Class="metric-value">@dashboard.OpenSupportTicketCount</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Assignments</MudText>
+                    <MudText Class="metric-value">@dashboard.PendingSubmissionCount</MudText>
+                    <MudText Typo="Typo.caption" Class="muted-text">
+                        pending review
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Attendance Issues</MudText>
+                    <MudText Class="metric-value">@dashboard.OpenAttendanceIssueCount</MudText>
+                    <MudText Typo="Typo.caption" Class="muted-text">
+                        open or in review
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Payment Due</MudText>
+                    <MudText Class="metric-value">@dashboard.PaymentDueCount</MudText>
+                    <MudText Typo="Typo.caption" Class="muted-text">
+                        due or grace period
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Locked Students</MudText>
+                    <MudText Class="metric-value">@dashboard.LockedStudentCount</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        @if (!string.IsNullOrWhiteSpace(statusMessage))
+       {
+            <MudAlert Severity="@statusSeverity" Dense="true" Class="mb-4">
+                @statusMessage
+            </MudAlert>
+        }
+
+        <MudTabs Elevation="0" Rounded="true" PanelClass="pt-4">
+            <MudTabPanel Text="Users">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Create User</MudText>
+
+                            <MudTextField T="string"
+                                          Label="Full name"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newUserFullName"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Email"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newUserEmail"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Password"
+                                          Variant="Variant.Outlined"
+                                          InputType="InputType.Password"
+                                          @bind-Value="newUserPassword"
+                                          Class="mb-3" />
+
+                            <MudSelect T="int"
+                                       Label="Role"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="newUserRoleId"
+                                       Class="mb-4">
+                                @foreach (var role in roles)
+                               {
+                                    <MudSelectItem T="int" Value="@role.Id">
+                                        @GetRoleLabel(role.Name)
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="@isSaving"
+                                       OnClick="CreateUserAsync">
+                                Create User
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="8">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">User Directory</MudText>
+
+                            <MudStack Spacing="2">
+                                @foreach (var user in users)
+                               {
+                                    <MudPaper Class="list-card pa-4">
+                                        <MudGrid>
+                                            <MudItem xs="12" md="4">
+                                                <MudText Typo="Typo.subtitle1">@user.FullName</MudText>
+                                                <MudText Typo="Typo.caption" Class="muted-text">
+                                                    @user.Email
+                                                </MudText>
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="3">
+                                                <MudText Class="metric-label">Role</MudText>
+                                                <MudText Typo="Typo.body2">@GetRoleLabel(user.Role)</MudText>
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="2">
+                                                <MudChip T="string"
+                                                         Color="@(user.IsActive ? Color.Success : Color.Default)">
+                                                    @(user.IsActive ? "Active" : "Inactive")
+                                                </MudChip>
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="3">
+                                                <MudButton Variant="Variant.Outlined"
+                                                           Color="@(user.IsActive ? Color.Warning : Color.Success)"
+                                                           OnClick="@(() => ToggleUserStatusAsync(user))">
+                                                    @(user.IsActive ? "Deactivate" : "Activate")
+                                                </MudButton>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Batches">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Create Batch</MudText>
+
+                            <MudTextField T="string"
+                                          Label="Batch name"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newBatchName"
+                                          Class="mb-3" />
+
+                            <MudNumericField T="int"
+                                             Label="Batch number"
+                                             Variant="Variant.Outlined"
+                                             Min="1"
+                                             @bind-Value="newBatchNumber"
+                                             Class="mb-3" />
+
+                            <MudSelect T="int"
+                                       Label="Track"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="newBatchTrackId"
+                                       Class="mb-3">
+                                @foreach (var track in tracks)
+                               {
+                                    <MudSelectItem T="int" Value="@track.Id">
+                                        @track.Name
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudTextField T="string"
+                                          Label="Level"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newBatchLevel"
+                                          Class="mb-3" />
+
+                            <MudNumericField T="int"
+                                             Label="Capacity"
+                                             Variant="Variant.Outlined"
+                                             Min="1"
+                                             @bind-Value="newBatchCapacity"
+                                             Class="mb-3" />
+
+                            <MudSelect T="Guid"
+                                       Label="Main mentor"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="newBatchMentorId"
+                                       Class="mb-3">
+                                <MudSelectItem T="Guid" Value="@Guid.Empty">
+                                    Not assigned
+                                </MudSelectItem>
+                                @foreach (var mentor in MainMentors)
+                               {
+                                    <MudSelectItem T="Guid" Value="@mentor.Id">
+                                        @mentor.FullName
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudSelect T="Guid"
+                                       Label="Assistant mentor"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="newBatchAssistantMentorId"
+                                       Class="mb-4">
+                                <MudSelectItem T="Guid" Value="@Guid.Empty">
+                                    Not assigned
+                                </MudSelectItem>
+                                @foreach (var mentor in AssistantMentors)
+                               {
+                                    <MudSelectItem T="Guid" Value="@mentor.Id">
+                                        @mentor.FullName
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="@isSaving"
+                                       OnClick="CreateBatchAsync">
+                                Create Batch
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="8">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Batch Operations</MudText>
+
+                            <MudStack Spacing="2">
+                                @foreach (var batch in batches)
+                               {
+                                    <MudPaper Class="list-card pa-4">
+                                        <MudGrid>
+                                            <MudItem xs="12" md="4">
+                                                <MudText Typo="Typo.subtitle1">@batch.Name</MudText>
+                                                <MudText Typo="Typo.caption" Class="muted-text">
+                                                    @batch.TrackName / @batch.Level
+                                                </MudText>
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="2">
+                                                <MudText Class="metric-label">Strength</MudText>
+                                                <MudText Typo="Typo.body2">
+                                                    @batch.CurrentStrength/@batch.Capacity
+                                                </MudText>
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="3">
+                                                <MudText Class="metric-label">Main Mentor</MudText>
+                                                <MudText Typo="Typo.body2">@batch.MentorName</MudText>
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="3">
+                                                <MudText Class="metric-label">Assistant</MudText>
+                                                <MudText Typo="Typo.body2">@batch.AssistantMentorName</MudText>
+                                            </MudItem>
+                                        </MudGrid>
+
+                                        <MudGrid Class="mt-3">
+                                            <MudItem xs="12" md="4">
+                                                <MudSelect T="Guid"
+                                                           Label="Main mentor"
+                                                           Variant="Variant.Outlined"
+                                                           Value="@(batch.MentorId ?? Guid.Empty)"
+                                                           ValueChanged="@((Guid value) => UpdateBatchMentorAsync(batch, value, batch.AssistantMentorId ?? Guid.Empty))">
+                                                    <MudSelectItem T="Guid" Value="@Guid.Empty">
+                                                        Not assigned
+                                                    </MudSelectItem>
+                                                    @foreach (var mentor in MainMentors)
+                                                   {
+                                                        <MudSelectItem T="Guid" Value="@mentor.Id">
+                                                            @mentor.FullName
+                                                        </MudSelectItem>
+                                                    }
+                                                </MudSelect>
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="4">
+                                                <MudSelect T="Guid"
+                                                           Label="Assistant mentor"
+                                                           Variant="Variant.Outlined"
+                                                           Value="@(batch.AssistantMentorId ?? Guid.Empty)"
+                                                           ValueChanged="@((Guid value) => UpdateBatchMentorAsync(batch, batch.MentorId ?? Guid.Empty, value))">
+                                                    <MudSelectItem T="Guid" Value="@Guid.Empty">
+                                                        Not assigned
+                                                    </MudSelectItem>
+                                                    @foreach (var mentor in AssistantMentors)
+                                                   {
+                                                        <MudSelectItem T="Guid" Value="@mentor.Id">
+                                                            @mentor.FullName
+                                                        </MudSelectItem>
+                                                    }
+                                                </MudSelect>
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="4">
+                                                <MudChip T="string"
+                                                         Color="@(batch.IsActive ? Color.Success : Color.Default)">
+                                                    @(batch.IsActive ? "Active" : "Inactive")
+                                                </MudChip>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Tracks">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Create Track</MudText>
+
+                            <MudTextField T="string"
+                                          Label="Track name"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newTrackName"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Level"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newTrackLevel"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Batch prefix"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newTrackPrefix"
+                                          Class="mb-4" />
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="@isSaving"
+                                       OnClick="CreateTrackAsync">
+                                Create Track
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="8">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Tracks</MudText>
+
+                            <MudGrid>
+                                @foreach (var track in tracks)
+                               {
+                                    <MudItem xs="12" sm="6">
+                                        <MudPaper Class="list-card pa-4">
+                                            <MudText Typo="Typo.subtitle1">@track.Name</MudText>
+                                            <MudText Typo="Typo.body2" Class="muted-text">
+                                                @track.Level / @track.BatchPrefix
+                                            </MudText>
+                                            <MudChip T="string" Color="Color.Info" Class="mt-3">
+                                                @track.ModuleCount modules
+                                            </MudChip>
+                                        </MudPaper>
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Students">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6" Class="mb-4">Students</MudText>
+
+                    <MudStack Spacing="2">
+                        @foreach (var student in students)
+                       {
+                            <MudPaper Class="list-card pa-4">
+                                <MudGrid>
+                                    <MudItem xs="12" md="3">
+                                        <MudText Typo="Typo.subtitle1">@student.FullName</MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            @student.Email
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Batch</MudText>
+                                        <MudText Typo="Typo.body2">@student.BatchName</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Track</MudText>
+                                        <MudText Typo="Typo.body2">@student.TrackName</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Progress</MudText>
+                                        <MudText Typo="Typo.body2">@student.ProgressPercentage%</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Attendance</MudText>
+                                        <MudText Typo="Typo.body2">@student.AttendancePercentage%</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="1">
+                                        <MudChip T="string" Color="@GetBillingColor(student.BillingStatus)">
+                                            @student.BillingStatus
+                                        </MudChip>
+                                    </MudItem>
+                                </MudGrid>
+
+                                <MudGrid Class="mt-3">
+                                    <MudItem xs="12" md="3">
+                                        <MudText Class="metric-label">Fee</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            INR @student.MonthlyFee
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="3">
+                                        <MudText Class="metric-label">Next Due</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @FormatDate(student.NextDueDate)
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="3">
+                                        <MudText Class="metric-label">Grace Ends</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @FormatDate(student.GraceEndsAt)
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="3">
+                                        <MudStack Row="true" Spacing="1">
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Success"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => UpdateStudentBillingAsync(student, BillingStatus.Active))">
+                                                Unlock
+                                            </MudButton>
+
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small"
+                                                       OnClick="@(() => UpdateStudentBillingAsync(student, BillingStatus.Locked))">
+                                                Lock
+                                            </MudButton>
+                                        </MudStack>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Modules">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Create Module</MudText>
+
+                            <MudTextField T="string"
+                                          Label="Title"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newModuleTitle"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Description"
+                                          Variant="Variant.Outlined"
+                                          Lines="4"
+                                          @bind-Value="newModuleDescription"
+                                          Class="mb-3" />
+
+                            <MudNumericField T="int"
+                                             Label="Order"
+                                             Variant="Variant.Outlined"
+                                             Min="1"
+                                             @bind-Value="newModuleOrder"
+                                             Class="mb-3" />
+
+                            <MudCheckBox T="bool"
+                                         Label="Published"
+                                         @bind-Value="newModulePublished"
+                                         Class="mb-4" />
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="@isSaving"
+                                       OnClick="CreateModuleAsync">
+                                Create Module
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="8">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Modules</MudText>
+
+                            <MudStack Spacing="2">
+                                @foreach (var module in modules)
+                               {
+                                    <MudPaper Class="list-card pa-4">
+                                        <MudStack Row="true"
+                                                  Justify="Justify.SpaceBetween"
+                                                  AlignItems="AlignItems.Start">
+                                            <div>
+                                                <MudText Typo="Typo.subtitle1">@module.Title</MudText>
+                                                <MudText Typo="Typo.body2" Class="muted-text">
+                                                    @module.Description
+                                                </MudText>
+                                            </div>
+
+                                            <MudChip T="string" Color="Color.Info">
+                                                @module.LessonCount lessons
+                                            </MudChip>
+                                        </MudStack>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Support">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6" Class="mb-4">Support Overview</MudText>
+
+                    <MudStack Spacing="2">
+                        @foreach (var ticket in supportTickets)
+                       {
+                            <MudPaper Class="list-card pa-4">
+                                <MudStack Row="true"
+                                          Justify="Justify.SpaceBetween"
+                                          AlignItems="AlignItems.Start">
+                                    <div>
+                                        <MudText Typo="Typo.subtitle1">@ticket.Subject</MudText>
+                                        <MudText Typo="Typo.body2" Class="muted-text">
+                                            @ticket.StudentName / @ticket.BatchName
+                                        </MudText>
+                                    </div>
+
+                                    <MudChip T="string" Color="@GetSupportColor(ticket.Status)">
+                                        @ticket.Status
+                                    </MudChip>
+                                </MudStack>
+
+                                <MudText Typo="Typo.body2" Class="mt-3">
+                                    @ticket.Message
+                                </MudText>
+
+                                @if (!string.IsNullOrWhiteSpace(ticket.MentorResponse))
+                               {
+                                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                                        @ticket.MentorResponse
+                                    </MudAlert>
+                                }
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Billing">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6" Class="mb-4">Batch Billing</MudText>
+
+                    <MudStack Spacing="2">
+                        @foreach (var batchBilling in batchBillingSummaries)
+                       {
+                            <MudPaper Class="list-card pa-4">
+                                <MudGrid>
+                                    <MudItem xs="12" md="3">
+                                        <MudText Typo="Typo.subtitle1">@batchBilling.BatchName</MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            @batchBilling.TrackName
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Students</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @batchBilling.TotalStudents
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Paid</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @batchBilling.PaidStudentCount
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Not Paid</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @batchBilling.UnpaidStudentCount
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Pending</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            INR @batchBilling.PendingAmount
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="1">
+                                        <MudButton Variant="Variant.Text"
+                                                   Color="Color.Primary"
+                                                   Disabled="@(batchBilling.UnpaidStudentCount == 0)"
+                                                   OnClick="@(() => SelectBatchBilling(batchBilling))">
+                                            View
+                                        </MudButton>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                        }
+                    </MudStack>
+
+                    @if (selectedBatchBilling != null)
+                   {
+                        <MudDivider Class="my-5" />
+
+                        <MudStack Row="true"
+                                  Justify="Justify.SpaceBetween"
+                                  AlignItems="AlignItems.Center"
+                                  Class="mb-3">
+                            <div>
+                                <MudText Typo="Typo.h6">
+                                    Not Paid - @selectedBatchBilling.BatchName
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="muted-text">
+                                    @selectedBatchBilling.UnpaidStudentCount students need payment follow-up
+                                </MudText>
+                            </div>
+
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Default"
+                                       OnClick="@(() => selectedBatchBilling = null)">
+                                Close
+                            </MudButton>
+                        </MudStack>
+
+                        <MudStack Spacing="2">
+                            @foreach (var student in selectedBatchBilling.UnpaidStudents)
+                           {
+                                <MudPaper Class="list-card pa-4">
+                                    <MudGrid>
+                                        <MudItem xs="12" md="3">
+                                            <MudText Typo="Typo.subtitle1">@student.FullName</MudText>
+                                            <MudText Typo="Typo.caption" Class="muted-text">
+                                                @student.Email
+                                            </MudText>
+                                        </MudItem>
+
+                                        <MudItem xs="12" md="2">
+                                            <MudText Class="metric-label">Phone</MudText>
+                                            <MudText Typo="Typo.body2">@student.PhoneNumber</MudText>
+                                        </MudItem>
+
+                                        <MudItem xs="12" md="2">
+                                            <MudText Class="metric-label">Fee</MudText>
+                                            <MudText Typo="Typo.body2">
+                                                INR @student.MonthlyFee
+                                            </MudText>
+                                        </MudItem>
+
+                                        <MudItem xs="12" md="2">
+                                            <MudText Class="metric-label">Due</MudText>
+                                            <MudText Typo="Typo.body2">
+                                                @FormatDate(student.NextDueDate)
+                                            </MudText>
+                                        </MudItem>
+
+                                        <MudItem xs="12" md="2">
+                                            <MudText Class="metric-label">Grace Ends</MudText>
+                                            <MudText Typo="Typo.body2">
+                                                @FormatDate(student.GraceEndsAt)
+                                            </MudText>
+                                        </MudItem>
+
+                                        <MudItem xs="12" md="1">
+                                            <MudChip T="string" Color="@GetBillingColor(student.BillingStatus)">
+                                                @student.BillingStatus
+                                            </MudChip>
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    }
+
+                    <MudDivider Class="my-5" />
+
+                    <MudText Typo="Typo.h6" Class="mb-4">Recent Payments</MudText>
+
+                    <MudStack Spacing="2">
+                        @foreach (var payment in payments)
+                       {
+                            <MudPaper Class="list-card pa-4">
+                                <MudGrid>
+                                    <MudItem xs="12" md="3">
+                                        <MudText Typo="Typo.subtitle1">@payment.StudentName</MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            @payment.StudentEmail
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Batch</MudText>
+                                        <MudText Typo="Typo.body2">@payment.BatchName</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Amount</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @payment.Currency @payment.Amount
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Due</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @payment.DueDate.ToLocalTime().ToString("dd MMM yyyy")
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Reference</MudText>
+                                        <MudText Typo="Typo.body2">@payment.ProviderReference</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="1">
+                                        <MudChip T="string" Color="@GetPaymentColor(payment.Status)">
+                                            @payment.Status
+                                        </MudChip>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Submissions">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6" Class="mb-4">Assignment Submissions</MudText>
+
+                    <MudStack Spacing="2">
+                        @foreach (var submission in assignmentSubmissions)
+                       {
+                            <MudPaper Class="list-card pa-4">
+                                <MudStack Row="true"
+                                          Justify="Justify.SpaceBetween"
+                                          AlignItems="AlignItems.Start">
+                                    <div>
+                                        <MudText Typo="Typo.subtitle1">
+                                            @submission.AssignmentTitle
+                                        </MudText>
+                                        <MudText Typo="Typo.body2" Class="muted-text">
+                                            @submission.StudentName / @submission.BatchName
+                                        </MudText>
+                                    </div>
+
+                                    <MudChip T="string" Color="@GetSubmissionColor(submission.Status)">
+                                        @submission.Status
+                                    </MudChip>
+                                </MudStack>
+
+                                <MudText Typo="Typo.body2" Class="mt-3">
+                                    @submission.SubmissionLink
+                                </MudText>
+
+                                @if (!string.IsNullOrWhiteSpace(submission.Notes))
+                               {
+                                    <MudText Typo="Typo.body2" Class="muted-text mt-2">
+                                        @submission.Notes
+                                    </MudText>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(submission.Feedback))
+                               {
+                                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                                        @submission.Feedback
+                                    </MudAlert>
+                                }
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Attendance Issues">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6" Class="mb-4">Attendance Discrepancies</MudText>
+
+                    <MudStack Spacing="2">
+                        @foreach (var issue in attendanceDiscrepancies)
+                       {
+                            <MudPaper Class="list-card pa-4">
+                                <MudStack Row="true"
+                                          Justify="Justify.SpaceBetween"
+                                          AlignItems="AlignItems.Start">
+                                    <div>
+                                        <MudText Typo="Typo.subtitle1">
+                                            @issue.SessionTitle
+                                        </MudText>
+                                        <MudText Typo="Typo.body2" Class="muted-text">
+                                            @issue.StudentName / @issue.BatchName
+                                        </MudText>
+                                    </div>
+
+                                    <MudChip T="string" Color="@GetAttendanceIssueColor(issue.Status)">
+                                        @issue.Status
+                                    </MudChip>
+                                </MudStack>
+
+                                <MudGrid Class="mt-3">
+                                    <MudItem xs="12" md="3">
+                                        <MudText Class="metric-label">Current</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @(issue.CurrentStatus?.ToString() ?? "Not marked")
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="3">
+                                        <MudText Class="metric-label">Requested</MudText>
+                                        <MudText Typo="Typo.body2">@issue.RequestedStatus</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="6">
+                                        <MudText Class="metric-label">Reason</MudText>
+                                        <MudText Typo="Typo.body2">@issue.Reason</MudText>
+                                    </MudItem>
+                                </MudGrid>
+
+                                @if (!string.IsNullOrWhiteSpace(issue.ResolutionNote))
+                               {
+                                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                                        @issue.ResolutionNote
+                                    </MudAlert>
+                                }
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Payroll">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6" Class="mb-4">Upload Salary Slip</MudText>
+
+                    <MudGrid>
+                        <MudItem xs="12" md="4">
+                            <MudSelect T="Guid"
+                                       Label="Staff member"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="salaryUserId"
+                                       Class="mb-3">
+                                @foreach (var user in StaffUsers)
+                               {
+                                    <MudSelectItem T="Guid" Value="@user.Id">
+                                        @user.FullName - @GetRoleLabel(user.Role)
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+
+                        <MudItem xs="6" md="2">
+                            <MudNumericField T="int"
+                                             Label="Month"
+                                             Variant="Variant.Outlined"
+                                             Min="1"
+                                             Max="12"
+                                             @bind-Value="salaryMonth" />
+                        </MudItem>
+
+                        <MudItem xs="6" md="2">
+                            <MudNumericField T="int"
+                                             Label="Year"
+                                             Variant="Variant.Outlined"
+                                             Min="2020"
+                                             @bind-Value="salaryYear" />
+                        </MudItem>
+
+                        <MudItem xs="6" md="2">
+                            <MudNumericField T="decimal"
+                                             Label="Gross"
+                                             Variant="Variant.Outlined"
+                                             @bind-Value="salaryGross" />
+                        </MudItem>
+
+                        <MudItem xs="6" md="2">
+                            <MudNumericField T="decimal"
+                                             Label="Net"
+                                             Variant="Variant.Outlined"
+                                             @bind-Value="salaryNet" />
+                        </MudItem>
+
+                        <MudItem xs="12" md="8">
+                            <MudTextField T="string"
+                                          Label="Salary slip file URL"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="salaryFileUrl" />
+                        </MudItem>
+
+                        <MudItem xs="12" md="4">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="@isSaving"
+                                       OnClick="UploadSalarySlipAsync">
+                                Upload Salary Slip
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudTabPanel>
+        </MudTabs>
+    }
+</div>
+
+@code{
+    private AdminDashboardModel? dashboard;
+    private List<AdminRoleModel> roles = new();
+    private List<AdminUserModel> users = new();
+    private List<AdminTrackModel> tracks = new();
+    private List<AdminBatchModel> batches = new();
+    private List<AdminStudentModel> students = new();
+    private List<AdminModuleModel> modules = new();
+    private List<AdminSupportTicketModel> supportTickets = new();
+    private List<AdminAssignmentSubmissionModel> assignmentSubmissions = new();
+    private List<AdminAttendanceDiscrepancyModel> attendanceDiscrepancies = new();
+    private List<AdminPaymentModel> payments = new();
+    private List<AdminBatchBillingModel> batchBillingSummaries = new();
+    private AdminBatchBillingModel? selectedBatchBilling;
+
+    private bool isSaving;
+    private string statusMessage = string.Empty;
+    private Severity statusSeverity = Severity.Success;
+
+    private string newUserFullName = string.Empty;
+    private string newUserEmail = string.Empty;
+    private string newUserPassword = string.Empty;
+    private int newUserRoleId = 5;
+
+    private string newBatchName = string.Empty;
+    private int newBatchNumber = 1;
+    private int newBatchTrackId;
+    private string newBatchLevel = string.Empty;
+    private int newBatchCapacity = 15;
+    private Guid newBatchMentorId = Guid.Empty;
+    private Guid newBatchAssistantMentorId = Guid.Empty;
+
+    private string newTrackName = string.Empty;
+    private string newTrackLevel = string.Empty;
+    private string newTrackPrefix = string.Empty;
+
+    private string newModuleTitle = string.Empty;
+    private string newModuleDescription = string.Empty;
+    private int newModuleOrder = 1;
+    private bool newModulePublished = true;
+
+    private Guid salaryUserId = Guid.Empty;
+    private int salaryMonth = DateTime.Now.Month;
+    private int salaryYear = DateTime.Now.Year;
+    private decimal salaryGross;
+    private decimal salaryNet;
+    private string salaryFileUrl = string.Empty;
+
+    private List<AdminUserModel> MainMentors =>
+        users.Where(x => x.Role == "MainMentor" && x.IsActive).ToList();
+
+    private List<AdminUserModel> AssistantMentors =>
+        users.Where(x => x.Role == "AssistantMentor" && x.IsActive).ToList();
+
+    private List<AdminUserModel> StaffUsers =>
+        users.Where(x =>
+                x.IsActive &&
+                x.Role is "MainMentor" or "AssistantMentor" or "Admin")
+            .ToList();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        await LoadAllAsync();
+
+        StateHasChanged();
+    }
+
+    private async Task LoadAllAsync()
+   {
+        dashboard = await AdminService.GetDashboardAsync();
+
+        if (dashboard == null)
+       {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        roles = await AdminService.GetRolesAsync();
+        users = await AdminService.GetUsersAsync();
+        tracks = await AdminService.GetTracksAsync();
+        batches = await AdminService.GetBatchesAsync();
+        students = await AdminService.GetStudentsAsync();
+        modules = await AdminService.GetModulesAsync();
+        supportTickets = await AdminService.GetSupportTicketsAsync();
+        assignmentSubmissions =
+            await AdminService.GetAssignmentSubmissionsAsync();
+        attendanceDiscrepancies =
+            await AdminService.GetAttendanceDiscrepanciesAsync();
+        payments = await AdminService.GetPaymentsAsync();
+        batchBillingSummaries = await AdminService.GetBatchBillingAsync();
+
+        newUserRoleId = roles.FirstOrDefault(x => x.Name == "Student")?.Id
+            ?? roles.FirstOrDefault()?.Id
+            ?? 5;
+
+        newBatchTrackId = tracks.FirstOrDefault()?.Id ?? 0;
+        salaryUserId = StaffUsers.FirstOrDefault()?.Id ?? Guid.Empty;
+    }
+
+    private async Task CreateUserAsync()
+   {
+        if (string.IsNullOrWhiteSpace(newUserFullName) ||
+            string.IsNullOrWhiteSpace(newUserEmail) ||
+            string.IsNullOrWhiteSpace(newUserPassword) ||
+            newUserRoleId <= 0)
+       {
+            ShowStatus("Name, email, password, and role are required.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var user = await AdminService.CreateUserAsync(
+            new CreateAdminUserModel
+           {
+                FullName = newUserFullName,
+                Email = newUserEmail,
+                Password = newUserPassword,
+                RoleId = newUserRoleId
+            });
+
+        isSaving = false;
+
+        if (user == null)
+       {
+            ShowStatus("User could not be created.", Severity.Error);
+            return;
+        }
+
+        users = await AdminService.GetUsersAsync();
+        dashboard = await AdminService.GetDashboardAsync();
+        newUserFullName = string.Empty;
+        newUserEmail = string.Empty;
+        newUserPassword = string.Empty;
+        ShowStatus("User created.", Severity.Success);
+    }
+
+    private async Task ToggleUserStatusAsync(AdminUserModel user)
+   {
+        var updated = await AdminService.UpdateUserStatusAsync(
+            user.Id,
+            !user.IsActive);
+
+        if (updated == null)
+       {
+            ShowStatus("User status could not be updated.", Severity.Error);
+            return;
+        }
+
+        users = await AdminService.GetUsersAsync();
+        dashboard = await AdminService.GetDashboardAsync();
+        ShowStatus("User status updated.", Severity.Success);
+    }
+
+    private async Task CreateBatchAsync()
+   {
+        if (string.IsNullOrWhiteSpace(newBatchName) ||
+            newBatchNumber <= 0 ||
+            newBatchTrackId <= 0)
+       {
+            ShowStatus("Batch name, number, and track are required.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var batch = await AdminService.CreateBatchAsync(
+            new CreateAdminBatchModel
+           {
+                Name = newBatchName,
+                BatchNumber = newBatchNumber,
+                TrackId = newBatchTrackId,
+                Level = newBatchLevel,
+                Capacity = newBatchCapacity,
+                MentorId = newBatchMentorId == Guid.Empty
+                    ? null
+                    : newBatchMentorId,
+                AssistantMentorId = newBatchAssistantMentorId == Guid.Empty
+                    ? null
+                    : newBatchAssistantMentorId
+            });
+
+        isSaving = false;
+
+        if (batch == null)
+       {
+            ShowStatus("Batch could not be created.", Severity.Error);
+            return;
+        }
+
+        batches = await AdminService.GetBatchesAsync();
+        dashboard = await AdminService.GetDashboardAsync();
+        newBatchName = string.Empty;
+        ShowStatus("Batch created.", Severity.Success);
+    }
+
+    private async Task UpdateBatchMentorAsync(
+        AdminBatchModel batch,
+        Guid mentorId,
+        Guid assistantMentorId)
+   {
+        var updated = await AdminService.UpdateBatchMentorsAsync(
+            batch.Id,
+            new UpdateAdminBatchMentorsModel
+           {        
+                MentorId = mentorId == Guid.Empty ? null : mentorId,
+                AssistantMentorId = assistantMentorId == Guid.Empty
+                    ? null
+                    : assistantMentorId
+            });
+
+        if (updated == null)
+       {
+            ShowStatus("Batch mentor allocation could not be updated.", Severity.Error);
+            return;
+        }
+
+        batches = await AdminService.GetBatchesAsync();
+        ShowStatus("Batch mentor allocation updated.", Severity.Success);
+    }
+
+    private async Task UpdateStudentBillingAsync(
+        AdminStudentModel student,
+        BillingStatus status)
+   {
+        var updated = await AdminService.UpdateStudentBillingStatusAsync(
+            student.Id,
+            status);
+
+        if (updated == null)
+       {
+            ShowStatus("Student billing status could not be updated.", Severity.Error);
+            return;
+        }
+
+        students = await AdminService.GetStudentsAsync();
+        dashboard = await AdminService.GetDashboardAsync();
+        batchBillingSummaries = await AdminService.GetBatchBillingAsync();
+        selectedBatchBilling = selectedBatchBilling == null
+            ? null
+            : batchBillingSummaries.FirstOrDefault(x =>
+                x.BatchId == selectedBatchBilling.BatchId);
+        ShowStatus("Student billing status updated.", Severity.Success);
+    }
+
+    private void SelectBatchBilling(AdminBatchBillingModel batchBilling)
+   {
+        selectedBatchBilling = batchBilling;
+    }
+
+    private async Task CreateTrackAsync()
+   {
+        if (string.IsNullOrWhiteSpace(newTrackName) ||
+            string.IsNullOrWhiteSpace(newTrackLevel) ||
+            string.IsNullOrWhiteSpace(newTrackPrefix))
+       {
+            ShowStatus("Track name, level, and prefix are required.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var track = await AdminService.CreateTrackAsync(
+            new CreateAdminTrackModel
+           {       
+                Name = newTrackName,
+                Level = newTrackLevel,
+                BatchPrefix = newTrackPrefix
+            });
+
+        isSaving = false;
+
+        if (track == null)
+       {
+            ShowStatus("Track could not be created.", Severity.Error);
+            return;
+        }
+
+        tracks = await AdminService.GetTracksAsync();
+        dashboard = await AdminService.GetDashboardAsync();
+        newTrackName = string.Empty;
+        newTrackLevel = string.Empty;
+        newTrackPrefix = string.Empty;
+        ShowStatus("Track created.", Severity.Success);
+    }
+
+    private async Task CreateModuleAsync()
+   {
+        if (string.IsNullOrWhiteSpace(newModuleTitle))
+       {
+            ShowStatus("Module title is required.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var module = await AdminService.CreateModuleAsync(
+            new CreateAdminModuleModel
+           {
+                Title = newModuleTitle,
+                Description = newModuleDescription,
+                Order = newModuleOrder,
+                IsPublished = newModulePublished
+            });
+
+        isSaving = false;
+
+        if (module == null)
+       {
+            ShowStatus("Module could not be created.", Severity.Error);
+            return;
+        }
+
+        modules = await AdminService.GetModulesAsync();
+        dashboard = await AdminService.GetDashboardAsync();
+        newModuleTitle = string.Empty;
+        newModuleDescription = string.Empty;
+        ShowStatus("Module created.", Severity.Success);
+    }
+
+    private async Task UploadSalarySlipAsync()
+   {
+        if (salaryUserId == Guid.Empty ||
+            salaryMonth < 1 ||
+            salaryMonth > 12 ||
+            salaryYear < 2020 ||
+            string.IsNullOrWhiteSpace(salaryFileUrl))
+       {
+            ShowStatus("Staff member, month, year, and file URL are required.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var slip = await OperationsService.CreateSalarySlipAsync(
+            new CreateSalarySlipModel
+           {        
+                UserId = salaryUserId,
+                Month = salaryMonth,
+                Year = salaryYear,
+                GrossAmount = salaryGross,
+                NetAmount = salaryNet,
+                FileUrl = salaryFileUrl
+            });
+
+        isSaving = false;
+
+        if (slip == null)
+       {
+            ShowStatus("Salary slip could not be uploaded.", Severity.Error);
+            return;
+        }
+
+        salaryFileUrl = string.Empty;
+        ShowStatus("Salary slip uploaded.", Severity.Success);
+    }
+
+    private void ShowStatus(string message, Severity severity)
+   {
+        statusMessage = message;
+        statusSeverity = severity;
+        Snackbar.Add(message, severity);
+    }
+
+    private static string GetRoleLabel(string role)
+   {
+        return role switch
+       {      
+            "SuperAdmin" => "Super Admin",
+            "MainMentor" => "Main Mentor",
+            "AssistantMentor" => "Assistant Mentor",
+            "CollegeCoordinator" => "College Coordinator",
+            _ => role
+        };
+    }
+
+    private static Color GetSupportColor(SupportTicketStatus status)
+   {
+        return status switch
+       {       
+            SupportTicketStatus.Resolved => Color.Success,
+            SupportTicketStatus.InReview => Color.Info,
+            _ => Color.Warning
+        };
+    }
+
+    private static Color GetBillingColor(BillingStatus status)
+   {
+        return status switch
+       {
+            BillingStatus.Active => Color.Success,
+            BillingStatus.Trial => Color.Info,
+            BillingStatus.PaymentDue => Color.Warning,
+            BillingStatus.GracePeriod => Color.Warning,
+            BillingStatus.Locked => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetPaymentColor(PaymentStatus status)
+   {
+        return status switch
+       {        
+            PaymentStatus.Paid => Color.Success,
+            PaymentStatus.Failed => Color.Error,
+            PaymentStatus.Pending => Color.Warning,
+            _ => Color.Info
+        };
+    }
+
+    private static Color GetSubmissionColor(AssignmentSubmissionStatus status)
+   {
+        return status switch
+       {
+            AssignmentSubmissionStatus.Reviewed => Color.Success,
+            AssignmentSubmissionStatus.RevisionRequested => Color.Warning,
+            AssignmentSubmissionStatus.Submitted => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetAttendanceIssueColor(
+        AttendanceDiscrepancyStatus status)
+   {
+        return status switch
+       {
+            AttendanceDiscrepancyStatus.Approved => Color.Success,
+            AttendanceDiscrepancyStatus.Rejected => Color.Error,
+            AttendanceDiscrepancyStatus.InReview => Color.Info,
+            _ => Color.Warning
+        };
+    }
+
+    private static string FormatDate(DateTime? value)
+   {
+        return value?.ToLocalTime().ToString("dd MMM yyyy") ?? "Not set";
+    }
+}

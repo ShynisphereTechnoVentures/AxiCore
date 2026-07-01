@@ -1,0 +1,69 @@
+@page "/modules"
+
+@using AxiPlus.Web.Models
+@using AxiPlus.Web.Services
+
+@inject ModuleApiService ModuleApiService
+
+<div class="page-shell">
+    <div class="page-header">
+        <div>
+            <MudText Typo="Typo.h4">Modules</MudText>
+            <MudText Typo="Typo.body2">Published curriculum modules</MudText>
+        </div>
+    </div>
+
+    @if (modules == null)
+   {
+        <div class="loading-state">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else if (!modules.Any())
+   {
+        <MudAlert Severity="Severity.Info">No modules found.</MudAlert>
+    }
+    else
+   {
+        <MudGrid>
+            @foreach (var module in modules.OrderBy(x => x.Order))
+           {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudPaper Class="surface-card pa-5">
+                        <MudStack Row="true"
+                                  Justify="Justify.SpaceBetween"
+                                  AlignItems="AlignItems.Start">
+                            <div>
+                                <MudText Typo="Typo.h6">@module.Title</MudText>
+                                <MudText Typo="Typo.body2" Class="muted-text">
+                                    @module.Description
+                                </MudText>
+                            </div>
+
+                            <MudChip T="string"
+                                     Color="@(module.IsPublished ? Color.Success : Color.Default)">
+                                @(module.IsPublished ? "Published" : "Draft")
+                            </MudChip>
+                        </MudStack>
+
+                        <MudDivider Class="my-4" />
+
+                        <MudText Typo="Typo.caption" Class="metric-label">
+                            Lessons
+                        </MudText>
+                        <MudText Typo="Typo.h6">@module.LessonCount</MudText>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</div>
+
+@code{
+    private List<ModuleModel>? modules;
+
+    protected override async Task OnInitializedAsync()
+   {
+        modules = await ModuleApiService.GetModulesAsync();
+    }
+}

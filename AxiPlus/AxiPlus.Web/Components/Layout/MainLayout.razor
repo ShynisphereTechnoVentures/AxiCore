@@ -1,0 +1,107 @@
+@inherits LayoutComponentBase
+@using AxiPlus.Web.Services
+@using MudBlazor
+@using System.Reflection
+
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout Class="app-shell">
+    <MudAppBar Elevation="0" Class="app-bar">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="ToggleDrawer"
+                       Class="mr-2" />
+
+        <div class="app-brand">
+            <span class="app-brand-mark">A</span>
+            <div>
+                <MudText Typo="Typo.subtitle1" Class="app-brand-title">
+                    AxiPlus LMS
+                </MudText>
+                <MudText Typo="Typo.caption" Class="app-brand-subtitle">
+                    @PortalLabel
+                </MudText>
+            </div>
+        </div>
+
+        <MudSpacer />
+
+        <MudChip T="string" Color="Color.Default" Variant="Variant.Outlined" Class="role-chip">
+            @PortalLabel
+        </MudChip>
+
+        <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                       Color="Color.Inherit"
+                       OnClick="Logout" />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="drawerOpen"
+               Elevation="0"
+               Variant="DrawerVariant.Responsive"
+               Class="app-drawer">
+        <div class="drawer-header">
+            <MudText Typo="Typo.subtitle2">Navigation</MudText>
+            <MudText Typo="Typo.caption">@PortalLabel</MudText>
+        </div>
+
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent Class="app-main">
+        <div class="app-content">
+            @Body
+        </div>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">x</span>
+</div>
+
+@code{
+    private bool drawerOpen = true;
+    private string? userRole;
+
+    private string PortalLabel => userRole switch
+   {
+        "SuperAdmin" => "Super Admin Portal",
+        "Admin" => "Admin Portal",
+        "MainMentor" => "Mentor Portal",
+        "AssistantMentor" => "Assistant Mentor Portal",
+        "CollegeCoordinator" => "College Portal",
+        "Student" => "Student Portal",
+        _ => "Portal"
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        userRole = await AuthService.GetRoleAsync();
+        StateHasChanged();
+    }
+
+    private void ToggleDrawer()
+   {
+        drawerOpen = !drawerOpen;
+    }
+
+    private async Task Logout()
+   {
+        await AuthService.LogoutAsync();
+
+        Navigation.NavigateTo("/login", true);
+    }
+}

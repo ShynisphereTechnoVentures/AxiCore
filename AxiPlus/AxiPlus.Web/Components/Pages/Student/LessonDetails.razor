@@ -1,0 +1,405 @@
+@page "/student/lesson/{LessonId:guid}"
+
+@using AxiPlus.Web.Models
+@using AxiPlus.Web.Models.Assignments
+@using AxiPlus.Web.Models.Modules
+@using AxiPlus.Web.Services
+
+@inject LessonApiService LessonService
+@inject LessonLiveClassApiService LiveClassService
+@inject AssignmentApiService AssignmentService
+@inject StudentPortalApiService StudentPortalService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<div class="page-shell">
+    @if (lesson == null)
+   {
+        <div class="loading-state">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else
+   {
+        <div class="page-header">
+            <div>
+                <MudText Typo="Typo.h4">@lesson.Title</MudText>
+                <MudText Typo="Typo.body2">@lesson.Description</MudText>
+            </div>
+
+            <MudChip T="string" Color="@GetStatusColor()" Variant="Variant.Filled">
+                @lesson.Status
+            </MudChip>
+        </div>
+
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudPaper Class="surface-card pa-5 mb-4">
+                    <MudText Typo="Typo.h6">Lesson Notes</MudText>
+                    <MudDivider Class="my-3" />
+
+                    @if (string.IsNullOrWhiteSpace(lesson.Content))
+                   {
+                        <MudAlert Severity="Severity.Info">
+                            Notes will appear when the mentor publishes this lesson.
+                        </MudAlert>
+                    }
+                    else
+                   {
+                        <MudText Typo="Typo.body1">@lesson.Content</MudText>
+                    }
+                </MudPaper>
+
+                <MudPaper Class="surface-card pa-5">
+                    <MudStack Row="true"
+                              Justify="Justify.SpaceBetween"
+                              AlignItems="AlignItems.Center">
+                        <div>
+                            <MudText Typo="Typo.h6">Practice</MudText>
+                            <MudText Typo="Typo.body2" Class="muted-text">
+                                @lesson.Title
+                            </MudText>
+                        </div>
+
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   OnClick="LaunchPracticeAsync"
+                                   Disabled="@isPracticeLaunching">
+                            Open Practice
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+
+                <MudPaper Class="surface-card pa-5 mt-4">
+                    <MudText Typo="Typo.h6">Assignments</MudText>
+                    <MudDivider Class="my-3" />
+
+                    @if (lessonAssignments.Count == 0)
+                   {
+                        <MudAlert Severity="Severity.Info">
+                            No assignment has been attached to this lesson yet.
+                        </MudAlert>
+                    }
+                    else
+                   {
+                        <MudStack Spacing="2">
+                            @foreach (var assignment in lessonAssignments)
+                           {
+                                <MudPaper Class="list-card pa-3">
+                                    <MudStack Row="true"
+                                              Justify="Justify.SpaceBetween"
+                                              AlignItems="AlignItems.Start">
+                                        <div>
+                                            <MudText Typo="Typo.subtitle2">
+                                                @assignment.Title
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Class="muted-text">
+                                                Due @assignment.DueAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                            </MudText>
+                                        </div>
+
+                                        <MudChip T="string" Color="@GetAssignmentColor(assignment)">
+                                            @assignment.Status
+                                        </MudChip>
+                                    </MudStack>
+
+                                    <MudText Typo="Typo.body2" Class="mt-2">
+                                        @assignment.Description
+                                    </MudText>
+
+                                    @if (!string.IsNullOrWhiteSpace(assignment.SubmissionLink))
+                                   {
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            Submitted: @assignment.SubmissionLink
+                                        </MudText>
+                                    }
+
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Primary"
+                                               Href="/student/assignments"
+                                               Class="mt-3">
+                                        Open Assignment
+                                    </MudButton>
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Class="surface-card pa-5 mb-4">
+                    <MudText Typo="Typo.h6">Live Classes</MudText>
+                    <MudDivider Class="my-3" />
+
+                    @if (liveClasses == null)
+                   {
+                        <MudProgressCircular Indeterminate="true" />
+                    }
+                    else if (!liveClasses.Any())
+                   {
+                        <MudAlert Severity="Severity.Info">
+                            No live classes scheduled yet.
+                        </MudAlert>
+                    }
+                    else
+                   {
+                        <MudStack Spacing="2">
+                            @foreach (var cls in liveClasses)
+                           {
+                                <MudPaper Class="list-card pa-3">
+                                    <MudStack Row="true"
+                                              Justify="Justify.SpaceBetween"
+                                              AlignItems="AlignItems.Start">
+                                        <div>
+                                            <MudText Typo="Typo.subtitle2">
+                                                @cls.ScheduledAt.ToLocalTime().ToString("dd MMM yyyy")
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Class="muted-text">
+                                                @cls.ScheduledAt.ToLocalTime().ToString("hh:mm tt")
+                                            </MudText>
+                                        </div>
+
+                                        <MudChip T="string" Color="@GetClassColor(cls)">
+                                            @GetClassStatus(cls)
+                                        </MudChip>
+                                    </MudStack>
+
+                                    <div class="action-row mt-3">
+                                        @if (GetClassStatus(cls) == "Live")
+                                       {
+                                            <MudButton Variant="Variant.Filled"
+                                                       Color="Color.Success"
+                                                       Href="@cls.MeetingLink"
+                                                       Target="_blank">
+                                                Join
+                                            </MudButton>
+                                        }
+
+                                        @if (!string.IsNullOrWhiteSpace(cls.RecordingLink))
+                                       {
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Href="@cls.RecordingLink"
+                                                       Target="_blank">
+                                                Recording
+                                            </MudButton>
+                                        }
+                                    </div>
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+
+                <MudPaper Class="surface-card pa-5 mb-4">
+                    <MudText Typo="Typo.h6">Lesson Access</MudText>
+                    <MudDivider Class="my-3" />
+
+                    <MudAlert Severity="Severity.Info" Class="mb-3">
+                        Lesson progress is updated from live class schedule,
+                        attendance, assignment review, and mentor approval.
+                    </MudAlert>
+
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Warning"
+                               FullWidth="true"
+                               OnClick="ReportLessonIssue">
+                        Report Issue
+                    </MudButton>
+                </MudPaper>
+
+                <MudPaper Class="surface-card pa-5">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween">
+                        @if (previousLesson != null)
+                       {
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       Href="@($"/student/lesson/{previousLesson.Id}")">
+                                Previous
+                            </MudButton>
+                        }
+                        else
+                       {
+                            <span></span>
+                        }
+
+                        @if (nextLesson != null)
+                       {
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Href="@($"/student/lesson/{nextLesson.Id}")">
+                                Next
+                            </MudButton>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</div>
+
+@code{
+    [Parameter]
+    public Guid LessonId{get;set; }
+
+    private LessonDetailsModel? lesson;
+    private List<LessonLiveClassModel>? liveClasses;
+    private List<LessonModel> moduleLessons = new();
+    private readonly List<StudentAssignmentModel> lessonAssignments = new();
+    private LessonModel? previousLesson;
+    private LessonModel? nextLesson;
+    private Guid loadedLessonId;
+    private bool isLoading;
+    private bool isPracticeLaunching;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (isLoading || loadedLessonId == LessonId)
+       {
+            return;
+        }
+
+        await LoadLessonAsync();
+
+        StateHasChanged();
+    }
+
+    private async Task LoadLessonAsync()
+   {
+        isLoading = true;
+        lesson = null;
+        liveClasses = null;
+        previousLesson = null;
+        nextLesson = null;
+        lessonAssignments.Clear();
+
+        var currentLessonId = LessonId;
+
+        lesson = await LessonService.GetLessonDetailsAsync(currentLessonId);
+
+        if (lesson == null || lesson.LessonId == Guid.Empty)
+       {
+            loadedLessonId = currentLessonId;
+            isLoading = false;
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        liveClasses = await LiveClassService.GetByLessonAsync(currentLessonId);
+        var assignments = await AssignmentService.GetMineAsync();
+        lessonAssignments.AddRange(assignments
+            .Where(x => x.LessonId == currentLessonId)
+            .OrderBy(x => x.DueAt));
+
+        moduleLessons = await LessonService.GetLessonsByModuleAsync(lesson.ModuleId);
+
+        var currentIndex = moduleLessons.FindIndex(x =>
+            x.Id == lesson.LessonId);
+
+        previousLesson = currentIndex > 0
+            ? moduleLessons[currentIndex - 1]
+            : null;
+
+        nextLesson = currentIndex >= 0 &&
+            currentIndex < moduleLessons.Count - 1
+                ? moduleLessons[currentIndex + 1]
+                : null;
+
+        loadedLessonId = currentLessonId;
+        isLoading = false;
+    }
+
+    private Color GetStatusColor()
+   {
+        return lesson?.Status switch
+       {
+            AxiPlus.Domain.Enums.LessonStatus.Completed => Color.Success,
+            AxiPlus.Domain.Enums.LessonStatus.NeedsRevision => Color.Error,
+            AxiPlus.Domain.Enums.LessonStatus.Pending => Color.Default,
+            _ => Color.Warning
+        };
+    }
+
+    private static string GetClassStatus(LessonLiveClassModel cls)
+   {
+        var start = cls.ScheduledAt.ToLocalTime();
+        var end = start.AddHours(2);
+        var now = DateTime.Now;
+
+        if (start <= now && end >= now)
+       {
+            return "Live";
+        }
+
+        return start > now ? "Upcoming" : "Completed";
+    }
+
+    private static Color GetClassColor(LessonLiveClassModel cls)
+   {
+        return GetClassStatus(cls) switch
+       {
+            "Live" => Color.Success,
+            "Upcoming" => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetAssignmentColor(StudentAssignmentModel assignment)
+   {
+        if (assignment.Status == "Submitted")
+       {
+            return Color.Info;
+        }
+
+        if (assignment.Status == "Reviewed")
+       {
+            return Color.Success;
+        }
+
+        return assignment.IsOverdue ? Color.Error : Color.Warning;
+    }
+
+    private string GetSupportUrl()
+   {
+        if (lesson == null)
+       {
+            return "/student/support";
+        }
+
+        return $"/student/support?lessonId={lesson.LessonId}&lessonTitle={Uri.EscapeDataString(lesson.Title)}";
+    }
+
+    private void ReportLessonIssue()
+   {
+        var url = GetSupportUrl();
+
+        Snackbar.Add("Opening support request for this lesson.", Severity.Info);
+        Navigation.NavigateTo(url);
+    }
+
+    private async Task LaunchPracticeAsync()
+   {
+        if (lesson == null)
+       {
+            return;
+        }
+
+        isPracticeLaunching = true;
+        try
+       {
+            var redirectUrl = await StudentPortalService.CreatePracticeLaunchUrlAsync(lesson.LessonId);
+            if (string.IsNullOrWhiteSpace(redirectUrl))
+           {
+                Snackbar.Add("Practice could not be opened. Please check your plan access and try again.", Severity.Error);
+                return;
+            }
+
+            Navigation.NavigateTo(redirectUrl, forceLoad: true);
+        }
+        finally
+       {
+            isPracticeLaunching = false;
+        }
+    }
+}

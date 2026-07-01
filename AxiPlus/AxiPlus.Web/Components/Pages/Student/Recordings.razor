@@ -1,0 +1,77 @@
+@page "/student/recordings"
+
+@using AxiPlus.Web.Models.StudentPortal
+@using AxiPlus.Web.Services
+
+@inject StudentPortalApiService StudentPortalService
+
+<MudText Typo="Typo.h4" Class="mb-6">Recordings</MudText>
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-5">
+        <MudText Typo="Typo.h6">Available Recordings</MudText>
+        <MudDivider Class="my-3" />
+
+        @if (recordings.Count == 0)
+       {
+            <MudAlert Severity="Severity.Info">
+                Class recordings will be listed here when mentors publish them.
+            </MudAlert>
+        }
+        else
+       {
+            <MudStack Spacing="2">
+                @foreach (var recording in recordings)
+               {
+                    <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                        <MudStack Row="true"
+                                  Justify="Justify.SpaceBetween"
+                                  AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.subtitle1">
+                                    @recording.LessonTitle
+                                </MudText>
+                                <MudText Typo="Typo.body2"
+                                         Color="Color.Secondary">
+                                    @recording.ModuleTitle
+                                </MudText>
+                                <MudText Typo="Typo.caption">
+                                    @recording.ScheduledAt.ToLocalTime().ToString("dd MMM yyyy")
+                                </MudText>
+                            </div>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Href="@recording.RecordingLink"
+                                       Target="_blank">
+                                Watch
+                            </MudButton>
+                        </MudStack>
+                    </MudPaper>
+                }
+            </MudStack>
+        }
+    </MudPaper>
+}
+
+@code{
+    private readonly List<StudentRecordingModel> recordings = new();
+    private bool isLoading = true;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        recordings.AddRange(await StudentPortalService.GetRecordingsAsync());
+        isLoading = false;
+        StateHasChanged();
+    }
+}

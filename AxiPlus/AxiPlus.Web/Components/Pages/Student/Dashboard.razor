@@ -1,0 +1,209 @@
+@page "/student/dashboard"
+
+@using AxiPlus.Web.Models
+@using AxiPlus.Web.Services
+
+@inject DashboardApiService DashboardService
+@inject NavigationManager Navigation
+
+<div class="page-shell">
+    @if (dashboard == null)
+    {
+        @if (isLoading)
+        {
+            <div class="loading-state">
+                <MudProgressCircular Indeterminate="true" />
+            </div>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">
+                @errorMessage
+            </MudAlert>
+        }
+    }
+    else
+    {
+        <div class="page-header">
+            <div>
+                <MudText Typo="Typo.h4">Welcome back, @dashboard.StudentName</MudText>
+                <MudText Typo="Typo.body2">
+                    @dashboard.BatchName / @dashboard.TrackName
+                </MudText>
+            </div>
+
+            <div class="action-row">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/student/modules">
+                    Continue Learning
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Success" Href="/student/liveclasses">
+                    Live Classes
+                </MudButton>
+            </div>
+        </div>
+
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Current Module</MudText>
+                    <MudText Class="metric-value">@dashboard.CurrentModule</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Attendance</MudText>
+                    <MudText Class="metric-value">@dashboard.AttendancePercentage%</MudText>
+                    <MudProgressLinear Value="@((double)dashboard.AttendancePercentage)" Color="Color.Success"
+                                       Class="mt-3" />
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Pending Assignments</MudText>
+                    <MudText Class="metric-value">@dashboard.PendingAssignments</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Overall Progress</MudText>
+                    <MudText Class="metric-value">@dashboard.ProgressPercentage%</MudText>
+                    <MudProgressLinear Value="@((double)dashboard.ProgressPercentage)" Color="Color.Primary" Class="mt-3" />
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudPaper Class="surface-card pa-5 mb-4">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                        <div>
+                            <MudText Typo="Typo.h6">Continue Learning</MudText>
+                            <MudText Typo="Typo.body2" Class="muted-text">
+                                @dashboard.CurrentModule
+                            </MudText>
+                        </div>
+
+                        <MudChip T="string" Color="Color.Info">
+                            In Progress
+                        </MudChip>
+                    </MudStack>
+
+                    <MudText Typo="Typo.h5">@dashboard.CurrentLesson</MudText>
+                    <MudProgressLinear Value="@((double)dashboard.ProgressPercentage)" Color="Color.Primary"
+                                       Class="mt-4 mb-2" />
+                    <MudText Typo="Typo.caption" Class="muted-text">
+                        @dashboard.ProgressPercentage% complete
+                    </MudText>
+
+                    <div class="action-row mt-4">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Href="/student/modules">
+                            Open Modules
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/student/practice">
+                            Practice
+                        </MudButton>
+                    </div>
+                </MudPaper>
+
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6" Class="mb-4">Learning Focus</MudText>
+
+                    <MudGrid>
+                        <MudItem xs="12" sm="4">
+                            <MudPaper Class="list-card pa-4">
+                                <MudText Class="metric-label">Modules</MudText>
+                                <MudText Typo="Typo.body2">
+                                    Review unlocked lessons and progress.
+                                </MudText>
+                            </MudPaper>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudPaper Class="list-card pa-4">
+                                <MudText Class="metric-label">Assignments</MudText>
+                                <MudText Typo="Typo.body2">
+                                    Submit project links before deadlines.
+                                </MudText>
+                            </MudPaper>
+                        </MudItem>
+
+                        <MudItem xs="12" sm="4">
+                            <MudPaper Class="list-card pa-4">
+                                <MudText Class="metric-label">Attendance</MudText>
+                                <MudText Typo="Typo.body2">
+                                    Track class participation.
+                                </MudText>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Class="surface-card pa-5 mb-4">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.h6">Assignments</MudText>
+                        <MudChip T="string" Color="Color.Warning">
+                            @dashboard.PendingAssignments pending
+                        </MudChip>
+                    </MudStack>
+
+                    <MudDivider Class="my-3" />
+
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                               Href="/student/assignments">
+                        View Assignments
+                    </MudButton>
+                </MudPaper>
+
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6">Mentors</MudText>
+                    <MudDivider Class="my-3" />
+
+                    <MudText Typo="Typo.caption" Class="metric-label">
+                        Main Mentor
+                    </MudText>
+                    <MudText Typo="Typo.subtitle1" Class="mb-3">
+                        @dashboard.MainMentor
+                    </MudText>
+
+                    <MudText Typo="Typo.caption" Class="metric-label">
+                        Assistant Mentor
+                    </MudText>
+                    <MudText Typo="Typo.subtitle1">
+                        @dashboard.AssistantMentor
+                    </MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</div>
+
+@code {
+    private StudentDashboardModel? dashboard;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        dashboard = await DashboardService.GetStudentDashboardAsync();
+        isLoading = false;
+
+        if (dashboard == null)
+        {
+            errorMessage = "Unable to load your dashboard. Please refresh or try again after confirming the API is running.";
+            StateHasChanged();
+            return;
+        }
+
+        StateHasChanged();
+    }
+}

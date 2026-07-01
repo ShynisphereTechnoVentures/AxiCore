@@ -1,0 +1,110 @@
+@page "/assessments/{AssessmentId:guid}"
+@using AxiForge.Application.DTOs.Assessments
+@inject AxiForge.Web.Services.AxiForgeApiClient ApiClient
+@inject AxiForge.Web.Services.AuthStateService AuthState
+
+<PageTitle>AxiForge Assessment</PageTitle>
+
+@if (assessment == null)
+{
+    <section class="forge-panel">
+        <p>Loading assessment...</p>
+    </section>
+}
+else
+{
+    <section class="forge-panel">
+        <p class="eyebrow">@assessment.DurationMinutes minute check</p>
+        <h1>@assessment.Title</h1>
+        <p class="lead">@assessment.Description</p>
+
+        @foreach (var question in assessment.Questions)
+        {
+            <div class="test-case">
+                <strong>@question.Order. @question.Prompt</strong>
+                <select @bind="answers[question.Id]">
+                    <option value="">Choose</option>
+                    <option value="A">A. @question.OptionA</option>
+                    <option value="B">B. @question.OptionB</option>
+                    <option value="C">C. @question.OptionC</option>
+                    <option value="D">D. @question.OptionD</option>
+                </select>
+            </div>
+        }
+
+        <button class="primary" @onclick="SubmitAsync">Submit</button>
+
+        @if (result != null)
+        {
+            <div class="result-box">
+                <strong>@result.Status</strong>
+                <span>@result.Score% · @result.CorrectAnswers / @result.TotalQuestions correct</span>
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="alert">@message</div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter]
+    public Guid AssessmentId { get; set; }
+
+    private AssessmentDetailDto? assessment;
+    private AssessmentResultDto? result;
+    private Dictionary<Guid, string> answers = new();
+    private string message = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Entering -> AssessmentTake.razor -> OnInitializedAsync");
+        try
+        {
+            assessment = await ApiClient.GetAssessmentAsync(AssessmentId);
+            answers = assessment?.Questions.ToDictionary(x => x.Id, _ => string.Empty)
+                ?? new Dictionary<Guid, string>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AssessmentTake.razor -> OnInitializedAsync -> {ex.Message}");
+            message = "Unable to load assessment.";
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AssessmentTake.razor -> OnInitializedAsync");
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        Console.WriteLine("Entering -> AssessmentTake.razor -> SubmitAsync");
+        try
+        {
+            if (!AuthState.IsAuthenticated)
+            {
+                message = "Please login before submitting.";
+                return;
+            }
+
+            result = await ApiClient.SubmitAssessmentAsync(
+                new SubmitAssessmentRequestDto
+                {
+                    AssessmentTemplateId = AssessmentId,
+                    Answers = answers
+                });
+
+            message = result == null ? "Submission failed." : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AssessmentTake.razor -> SubmitAsync -> {ex.Message}");
+            message = "Submission failed.";
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AssessmentTake.razor -> SubmitAsync");
+        }
+    }
+}

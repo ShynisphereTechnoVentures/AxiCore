@@ -1,0 +1,2001 @@
+@page "/mentor/dashboard"
+
+@using AxiPlus.Domain.Enums
+@using AxiPlus.Web.Models.MentorPortal
+@using AxiPlus.Web.Models.Operations
+@using AxiPlus.Web.Services
+@using MudBlazor
+
+@inject MentorPortalApiService MentorService
+@inject OperationsApiService OperationsService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Mentor Dashboard</PageTitle>
+
+<div class="page-shell">
+    @if (dashboard == null)
+   {
+        <div class="loading-state">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else
+   {
+        <div class="page-header">
+            <div>
+                <MudText Typo="Typo.h4">Mentor Workspace</MudText>
+                <MudText Typo="Typo.body2">
+                    @dashboard.MentorName / @GetRoleLabel(dashboard.Role)
+                </MudText>
+            </div>
+
+            <div class="action-row">
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           OnClick="RefreshAsync">
+                    Refresh
+                </MudButton>
+            </div>
+        </div>
+
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Assigned Batches</MudText>
+                    <MudText Class="metric-value">@dashboard.AssignedBatchCount</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Students</MudText>
+                    <MudText Class="metric-value">@dashboard.StudentCount</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Submissions To Review</MudText>
+                    <MudText Class="metric-value">@dashboard.PendingSubmissionCount</MudText>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Open Support</MudText>
+                    <MudText Class="metric-value">@dashboard.OpenSupportTicketCount</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudPaper Class="surface-card pa-4 mb-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudText Typo="Typo.subtitle2">Batch Focus</MudText>
+                <MudSelect T="Guid"
+                           Variant="Variant.Outlined"
+                           Dense="true"
+                           @bind-Value="selectedBatchId"
+                           Style="max-width: 320px;">
+                    <MudSelectItem T="Guid" Value="@Guid.Empty">
+                        All assigned batches
+                    </MudSelectItem>
+                    @foreach (var batch in batches)
+                   {
+                        <MudSelectItem T="Guid" Value="@batch.BatchId">
+                            @batch.Name
+                        </MudSelectItem>
+                    }
+                </MudSelect>
+                <MudChip T="string" Color="Color.Info">
+                    @FilteredStudents.Count() student(s)
+                </MudChip>
+                <MudChip T="string" Color="Color.Warning">
+                    @FilteredSubmissions.Count(x => x.Status == AssignmentSubmissionStatus.Submitted) review
+                </MudChip>
+                <MudChip T="string" Color="Color.Error">
+                    @FilteredAssignments.Count(x => x.IsOverdue && x.PendingReviewCount > 0) overdue
+                </MudChip>
+            </MudStack>
+        </MudPaper>
+
+        @if (!string.IsNullOrWhiteSpace(statusMessage))
+       {
+            <MudAlert Severity="@statusSeverity" Dense="true" Class="mb-4">
+                @statusMessage
+            </MudAlert>
+        }
+
+        <MudTabs Elevation="0" Rounded="true" PanelClass="pt-4">
+            <MudTabPanel Text="Batches">
+                <MudGrid>
+                    @foreach (var batch in FilteredBatches)
+                   {
+                        <MudItem xs="12" md="6" lg="4">
+                            <MudPaper Class="surface-card pa-5">
+                                <MudStack Row="true"
+                                          Justify="Justify.SpaceBetween"
+                                          AlignItems="AlignItems.Start">
+                                    <div>
+                                        <MudText Typo="Typo.h6">@batch.Name</MudText>
+                                        <MudText Typo="Typo.body2" Class="muted-text">
+                                            @batch.TrackName / @batch.Level
+                                        </MudText>
+                                    </div>
+
+                                    <MudChip T="string" Color="Color.Info">
+                                        @batch.CurrentStrength/@batch.Capacity
+                                    </MudChip>
+                                </MudStack>
+
+                                <MudDivider Class="my-4" />
+
+                                <MudText Class="metric-label">Average Progress</MudText>
+                                <MudProgressLinear Value="@((double)batch.AverageProgressPercentage)"
+                                                   Color="Color.Primary"
+                                                   Class="mb-2" />
+                                <MudText Typo="Typo.caption" Class="muted-text">
+                                    @batch.AverageProgressPercentage%
+                                </MudText>
+
+                                <MudText Class="metric-label mt-4">Attendance</MudText>
+                                <MudProgressLinear Value="@((double)batch.AttendancePercentage)"
+                                                   Color="@GetAttendanceColor(batch.AttendancePercentage)"
+                                                   Class="mb-2" />
+                                <MudText Typo="Typo.caption" Class="muted-text">
+                                    @batch.AttendancePercentage%
+                                </MudText>
+                            </MudPaper>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Students">
+                <MudPaper Class="surface-card pa-5">
+                    <MudStack Spacing="2">
+                        @foreach (var student in FilteredStudents)
+                       {
+                            <MudPaper Class="list-card pa-4">
+                                <MudGrid>
+                                    <MudItem xs="12" md="4">
+                                        <MudText Typo="Typo.subtitle1">@student.FullName</MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            @student.Email
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Batch</MudText>
+                                        <MudText Typo="Typo.body2">@student.BatchName</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Progress</MudText>
+                                        <MudText Typo="Typo.body2">@student.ProgressPercentage%</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudText Class="metric-label">Attendance</MudText>
+                                        <MudText Typo="Typo.body2">@student.AttendancePercentage%</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudChip T="string" Color="Color.Warning">
+                                            @student.PendingAssignments pending
+                                        </MudChip>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Student Reports">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6" Class="mb-4">Batch Student Reports</MudText>
+
+                    <MudStack Spacing="2">
+                        @foreach (var report in FilteredStudentReports)
+                       {
+                            <MudPaper Class="list-card pa-4">
+                                <MudGrid>
+                                    <MudItem xs="12" md="3">
+                                        <MudText Typo="Typo.subtitle1">@report.StudentName</MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            @report.BatchName / @report.TrackName
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" sm="6" md="2">
+                                        <MudText Class="metric-label">Attendance</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @report.AttendancePercentage%
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            P @report.PresentCount / L @report.LateCount / A @report.AbsentCount
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" sm="6" md="2">
+                                        <MudText Class="metric-label">Assignments</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @report.ReviewedAssignmentCount reviewed
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            @report.SubmittedAssignmentCount submitted / @report.PendingAssignmentCount pending
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" sm="6" md="2">
+                                        <MudText Class="metric-label">Projects</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @report.ReviewedProjectCount reviewed
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            @report.SubmittedProjectCount submitted / @report.ProjectCount total
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" sm="6" md="2">
+                                        <MudText Class="metric-label">Exam Report</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @report.ExamPassedCount passed
+                                        </MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            @report.ExamPendingCount pending / @report.ExamAttempts attempts
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="1">
+                                        <MudText Class="metric-label">Progress</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @report.ProgressPercentage%
+                                        </MudText>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Live Classes">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Schedule Class</MudText>
+
+                            <MudSelect T="Guid"
+                                       Label="Lesson"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="newLiveClassLessonId"
+                                       Class="mb-3">
+                                @foreach (var lesson in lessons)
+                               {
+                                    <MudSelectItem T="Guid" Value="@lesson.LessonId">
+                                        @lesson.ModuleTitle - @lesson.LessonTitle
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudTextField T="string"
+                                          Label="Scheduled at"
+                                          HelperText="Use format: 2026-06-22 19:00"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newLiveClassScheduledAt"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Meeting link"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newLiveClassMeetingLink"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Recording link"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newLiveClassRecordingLink"
+                                          Class="mb-4" />
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="@isSaving"
+                                       OnClick="CreateLiveClassAsync">
+                                Schedule Class
+                            </MudButton>
+                        </MudPaper>
+
+                        <MudPaper Class="surface-card pa-5 mt-4">
+                            <MudText Typo="Typo.h6" Class="mb-4">Weekly Batch Links</MudText>
+
+                            <MudSelect T="Guid"
+                                       Label="Batch"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="weeklyBatchId"
+                                       Class="mb-3">
+                                @foreach (var batch in batches)
+                               {
+                                    <MudSelectItem T="Guid" Value="@batch.BatchId">
+                                        @batch.Name
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudTextField T="string"
+                                          Label="Week start"
+                                          HelperText="Use format: 2026-06-22"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="weeklyStartDate"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Live class link"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="weeklyMeetLink"
+                                          Class="mb-3" />
+
+                            <div class="action-row mb-3">
+                                <MudCheckBox T="bool" Label="Mon" @bind-Value="weeklyMonday" />
+                                <MudCheckBox T="bool" Label="Tue" @bind-Value="weeklyTuesday" />
+                                <MudCheckBox T="bool" Label="Wed" @bind-Value="weeklyWednesday" />
+                                <MudCheckBox T="bool" Label="Thu" @bind-Value="weeklyThursday" />
+                                <MudCheckBox T="bool" Label="Fri" @bind-Value="weeklyFriday" />
+                            </div>
+
+                            <MudTextField T="string"
+                                          Label="Start time"
+                                          HelperText="Use format: 19:00"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="weeklyStartTime"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="End time"
+                                          HelperText="Use format: 20:30"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="weeklyEndTime"
+                                          Class="mb-4" />
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="@isSaving"
+                                       OnClick="CreateWeeklySessionsAsync">
+                                Upload Weekly Links
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="8">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Class Timeline</MudText>
+
+                            <MudStack Spacing="2">
+                                @foreach (var liveClass in liveClasses)
+                               {
+                                    <MudPaper Class="list-card pa-4">
+                                        <MudStack Row="true"
+                                                  Justify="Justify.SpaceBetween"
+                                                  AlignItems="AlignItems.Start">
+                                            <div>
+                                                <MudText Typo="Typo.subtitle1">
+                                                    @liveClass.LessonTitle
+                                                </MudText>
+                                                <MudText Typo="Typo.body2" Class="muted-text">
+                                                    @liveClass.ModuleTitle /
+                                                    @liveClass.ScheduledAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                                </MudText>
+                                            </div>
+
+                                            <MudChip T="string"
+                                                     Color="@(liveClass.IsCompleted ? Color.Default : Color.Success)">
+                                                @(liveClass.IsCompleted ? "Completed" : "Scheduled")
+                                            </MudChip>
+                                        </MudStack>
+
+                                        <div class="action-row mt-3">
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Href="@liveClass.MeetingLink"
+                                                       Target="_blank"
+                                                       Disabled="@string.IsNullOrWhiteSpace(liveClass.MeetingLink)">
+                                                Meeting
+                                            </MudButton>
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Href="@liveClass.RecordingLink"
+                                                       Target="_blank"
+                                                       Disabled="@string.IsNullOrWhiteSpace(liveClass.RecordingLink)">
+                                                Recording
+                                            </MudButton>
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Error"
+                                                       Disabled="@isSaving"
+                                                       OnClick="@(() => DeleteLiveClassAsync(liveClass.Id))">
+                                                Delete
+                                            </MudButton>
+                                        </div>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Assignments">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Create Assignment</MudText>
+
+                            <MudSelect T="Guid"
+                                       Label="Batch"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="newAssignmentBatchId"
+                                       Class="mb-3">
+                                @foreach (var batch in batches)
+                               {
+                                    <MudSelectItem T="Guid" Value="@batch.BatchId">
+                                        @batch.Name
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudSelect T="Guid"
+                                       Label="Lesson"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="newAssignmentLessonId"
+                                       Class="mb-3">
+                                <MudSelectItem T="Guid" Value="@Guid.Empty">
+                                    General assignment
+                                </MudSelectItem>
+                                @foreach (var lesson in lessons)
+                               {
+                                    <MudSelectItem T="Guid" Value="@lesson.LessonId">
+                                        @lesson.ModuleTitle - @lesson.LessonTitle
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudTextField T="string"
+                                          Label="Title"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newAssignmentTitle"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Description"
+                                          Variant="Variant.Outlined"
+                                          Lines="4"
+                                          @bind-Value="newAssignmentDescription"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Due at"
+                                          HelperText="Use format: 2026-06-25 23:59"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newAssignmentDueAt"
+                                          Class="mb-3" />
+
+                            <MudCheckBox T="bool"
+                                         Label="Publish now"
+                                         @bind-Value="newAssignmentPublished"
+                                         Class="mb-4" />
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="@isSaving"
+                                       OnClick="CreateAssignmentAsync">
+                                Create Assignment
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="8">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Published Work</MudText>
+
+                            <MudStack Spacing="2">
+                                @foreach (var assignment in FilteredAssignments)
+                               {
+                                    <MudPaper Class="list-card pa-4">
+                                        <MudGrid>
+                                            <MudItem xs="12" md="5">
+                                                <MudText Typo="Typo.subtitle1">
+                                                    @assignment.Title
+                                                </MudText>
+                                                <MudText Typo="Typo.body2" Class="muted-text">
+                                                    @assignment.BatchName / @assignment.ModuleTitle
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Class="muted-text">
+                                                    @GetAssignmentOwner(assignment)
+                                                </MudText>
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="3">
+                                                <MudText Class="metric-label">Due</MudText>
+                                                <MudText Typo="Typo.body2">
+                                                    @assignment.DueAt.ToLocalTime().ToString("dd MMM yyyy")
+                                                </MudText>
+                                                @if (assignment.IsOverdue)
+                                               {
+                                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">
+                                                        Overdue
+                                                    </MudChip>
+                                                }
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="2">
+                                                <MudText Class="metric-label">Submissions</MudText>
+                                                <MudText Typo="Typo.body2">
+                                                    @assignment.SubmissionCount
+                                                </MudText>
+                                            </MudItem>
+
+                                            <MudItem xs="12" md="2">
+                                                <MudChip T="string"
+                                                         Color="@(assignment.PendingReviewCount > 0 ? Color.Warning : Color.Success)">
+                                                    @assignment.PendingReviewCount review
+                                                </MudChip>
+                                            </MudItem>
+
+                                            <MudItem xs="12">
+                                                <MudButton Variant="Variant.Outlined"
+                                                           Color="Color.Error"
+                                                           Disabled="@isSaving"
+                                                           OnClick="@(() => DeleteAssignmentAsync(assignment.AssignmentId))">
+                                                    Delete Assignment
+                                                </MudButton>
+                                            </MudItem>
+                                        </MudGrid>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Reviews">
+                <MudGrid>
+                    <MudItem xs="12" md="7">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Student Submissions</MudText>
+
+                            <MudStack Spacing="2">
+                                @foreach (var submission in FilteredSubmissions)
+                               {
+                                    <MudPaper Class="list-card pa-4">
+                                        <MudStack Row="true"
+                                                  Justify="Justify.SpaceBetween"
+                                                  AlignItems="AlignItems.Start">
+                                            <div>
+                                                <MudText Typo="Typo.subtitle1">
+                                                    @submission.AssignmentTitle
+                                                </MudText>
+                                                <MudText Typo="Typo.body2" Class="muted-text">
+                                                    @submission.StudentName / @submission.SubmittedAt.ToLocalTime().ToString("dd MMM yyyy")
+                                                </MudText>
+                                            </div>
+
+                                            <MudChip T="string" Color="@GetSubmissionColor(submission.Status)">
+                                                @submission.Status
+                                            </MudChip>
+                                        </MudStack>
+
+                                        <div class="action-row mt-3">
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Href="@submission.SubmissionLink"
+                                                       Target="_blank">
+                                                Open Submission
+                                            </MudButton>
+                                            <MudButton Variant="Variant.Filled"
+                                                       Color="Color.Primary"
+                                                       OnClick="@(() => SelectSubmission(submission))">
+                                                Review
+                                            </MudButton>
+                                        </div>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="5">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Review Panel</MudText>
+
+                            @if (selectedSubmission == null)
+                           {
+                                <MudAlert Severity="Severity.Info">
+                                    Select a submission to leave feedback.
+                                </MudAlert>
+                            }
+                            else
+                           {
+                                <MudText Typo="Typo.subtitle1">
+                                    @selectedSubmission.AssignmentTitle
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="muted-text mb-4">
+                                    @selectedSubmission.StudentName
+                                </MudText>
+
+                                <div class="action-row mb-3">
+                                    <MudButton Variant="@(reviewStatus == AssignmentSubmissionStatus.Reviewed ? Variant.Filled : Variant.Outlined)"
+                                               Color="Color.Success"
+                                               OnClick="@(() => reviewStatus = AssignmentSubmissionStatus.Reviewed)">
+                                        Approve
+                                    </MudButton>
+                                    <MudButton Variant="@(reviewStatus == AssignmentSubmissionStatus.RevisionRequested ? Variant.Filled : Variant.Outlined)"
+                                               Color="Color.Warning"
+                                               OnClick="@(() => reviewStatus = AssignmentSubmissionStatus.RevisionRequested)">
+                                        Request Revision
+                                    </MudButton>
+                                </div>
+
+                                <MudTextField T="string"
+                                              Label="Feedback"
+                                              Variant="Variant.Outlined"
+                                              Lines="5"
+                                              @bind-Value="reviewFeedback"
+                                              Class="mb-4" />
+
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           FullWidth="true"
+                                           Disabled="@isSaving"
+                                           OnClick="SaveSubmissionReviewAsync">
+                                    Save Review
+                                </MudButton>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Attendance">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="surface-card pa-5 mb-4">
+                            <MudText Typo="Typo.h6" Class="mb-4">Create Session</MudText>
+
+                            <MudSelect T="Guid"
+                                       Label="Batch"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="newSessionBatchId"
+                                       Class="mb-3">
+                                @foreach (var batch in batches)
+                               {
+                                    <MudSelectItem T="Guid" Value="@batch.BatchId">
+                                        @batch.Name
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudTextField T="string"
+                                          Label="Title"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newSessionTitle"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Meet link"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newSessionMeetLink"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Start time"
+                                          HelperText="Use format: 2026-06-22 19:00"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newSessionStartTime"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="End time"
+                                          HelperText="Use format: 2026-06-22 20:30"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="newSessionEndTime"
+                                          Class="mb-4" />
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="@isSaving"
+                                       OnClick="CreateSessionAsync">
+                                Create Session
+                            </MudButton>
+                        </MudPaper>
+
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Sessions</MudText>
+
+                            <MudStack Spacing="2">
+                                @foreach (var session in FilteredSessions)
+                               {
+                                    <MudPaper Class="list-card pa-3">
+                                        <MudText Typo="Typo.subtitle2">@session.Title</MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            @session.BatchName /
+                                            @session.StartTime.ToLocalTime().ToString("dd MMM, hh:mm tt")
+                                        </MudText>
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Primary"
+                                                   FullWidth="true"
+                                                   Class="mt-3"
+                                                   OnClick="@(() => LoadRosterAsync(session.SessionId))">
+                                            Mark Attendance
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Error"
+                                                   FullWidth="true"
+                                                   Class="mt-2"
+                                                   Disabled="@isSaving"
+                                                   OnClick="@(() => DeleteSessionAsync(session.SessionId))">
+                                            Delete Session
+                                        </MudButton>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="8">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">
+                                @(attendanceRoster == null ? "Attendance Roster" : attendanceRoster.SessionTitle)
+                            </MudText>
+
+                            @if (attendanceRoster == null)
+                           {
+                                <MudAlert Severity="Severity.Info">
+                                    Select a session to mark attendance.
+                                </MudAlert>
+                            }
+                            else
+                           {
+                                <div class="action-row mb-3">
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Success"
+                                               OnClick="@(() => SetRosterStatus(AttendanceStatus.Present))">
+                                        Mark All Present
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Info"
+                                               OnClick="@(() => SetRosterStatus(AttendanceStatus.Late))">
+                                        Mark All Late
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Error"
+                                               OnClick="@(() => SetRosterStatus(AttendanceStatus.Absent))">
+                                        Mark All Absent
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Warning"
+                                               OnClick="SetUnmarkedAbsent">
+                                        Unmarked Absent
+                                    </MudButton>
+                                </div>
+
+                                <MudStack Spacing="2">
+                                    @foreach (var entry in attendanceRoster.Students)
+                                   {
+                                        <MudPaper Class="list-card pa-4">
+                                            <MudStack Row="true"
+                                                      Justify="Justify.SpaceBetween"
+                                                      AlignItems="AlignItems.Center">
+                                                <div>
+                                                    <MudText Typo="Typo.subtitle1">
+                                                        @entry.StudentName
+                                                    </MudText>
+                                                    <MudText Typo="Typo.caption" Class="muted-text">
+                                                        @entry.Email
+                                                    </MudText>
+                                                </div>
+
+                                                <div class="action-row">
+                                                    <MudButton Variant="@(entry.Status == AttendanceStatus.Present ? Variant.Filled : Variant.Outlined)"
+                                                               Color="Color.Success"
+                                                               OnClick="@(() => entry.Status = AttendanceStatus.Present)">
+                                                        Present
+                                                    </MudButton>
+                                                    <MudButton Variant="@(entry.Status == AttendanceStatus.Late ? Variant.Filled : Variant.Outlined)"
+                                                               Color="Color.Info"
+                                                               OnClick="@(() => entry.Status = AttendanceStatus.Late)">
+                                                        Late
+                                                    </MudButton>
+                                                    <MudButton Variant="@(entry.Status == AttendanceStatus.Absent ? Variant.Filled : Variant.Outlined)"
+                                                               Color="Color.Error"
+                                                               OnClick="@(() => entry.Status = AttendanceStatus.Absent)">
+                                                        Absent
+                                                    </MudButton>
+                                                </div>
+                                            </MudStack>
+                                        </MudPaper>
+                                    }
+                                </MudStack>
+
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           Class="mt-4"
+                                           Disabled="@isSaving"
+                                           OnClick="SaveAttendanceAsync">
+                                    Save Attendance
+                                </MudButton>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="@($"Support ({OpenSupportCount})")">
+                <MudGrid>
+                    <MudItem xs="12" md="7">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudStack Row="true"
+                                      Justify="Justify.SpaceBetween"
+                                      AlignItems="AlignItems.Center"
+                                      Class="mb-4">
+                                <div>
+                                    <MudText Typo="Typo.h6">Student Requests</MudText>
+                                    <MudText Typo="Typo.caption" Class="muted-text">
+                                        Open: @FilteredSupportTickets.Count(x => x.Status != SupportTicketStatus.Resolved) /
+                                        Total: @FilteredSupportTickets.Count()
+                                    </MudText>
+                                </div>
+
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Primary"
+                                           Disabled="@isSaving"
+                                           OnClick="RefreshSupportTicketsAsync">
+                                    Refresh
+                                </MudButton>
+                            </MudStack>
+
+                            @if (!FilteredSupportTickets.Any())
+                           {
+                                <MudAlert Severity="Severity.Info">
+                                    Student requests from your assigned batches will appear here.
+                                </MudAlert>
+                            }
+                            else
+                           {
+                                <MudStack Spacing="2">
+                                    @foreach (var ticket in FilteredSupportTickets)
+                                   {
+                                        <MudPaper Class="list-card pa-4">
+                                            <MudStack Row="true"
+                                                      Justify="Justify.SpaceBetween"
+                                                      AlignItems="AlignItems.Start">
+                                                <div>
+                                                    <MudText Typo="Typo.subtitle1">@ticket.Subject</MudText>
+                                                    <MudText Typo="Typo.body2" Class="muted-text">
+                                                        @ticket.StudentName / @ticket.BatchName
+                                                    </MudText>
+                                                    <MudText Typo="Typo.caption" Class="muted-text">
+                                                        @ticket.StudentEmail / @ticket.StudentPhoneNumber
+                                                    </MudText>
+                                                    <MudText Typo="Typo.caption" Class="muted-text">
+                                                        @ticket.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                                    </MudText>
+                                                </div>
+
+                                                <MudChip T="string" Color="@GetSupportColor(ticket.Status)">
+                                                    @ticket.Status
+                                                </MudChip>
+                                            </MudStack>
+
+                                            <MudText Typo="Typo.body2" Class="mt-3">
+                                                @ticket.Message
+                                            </MudText>
+
+                                            @if (!string.IsNullOrWhiteSpace(ticket.MentorResponse))
+                                           {
+                                                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                                                    Response: @ticket.MentorResponse
+                                                </MudAlert>
+                                            }
+
+                                            <MudButton Variant="Variant.Filled"
+                                                       Color="Color.Primary"
+                                                       Class="mt-3"
+                                                       OnClick="@(() => SelectTicket(ticket))">
+                                                Respond
+                                            </MudButton>
+                                        </MudPaper>
+                                    }
+                                </MudStack>
+                            }
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="5">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Response Panel</MudText>
+
+                            @if (selectedTicket == null)
+                           {
+                                <MudAlert Severity="Severity.Info">
+                                    Select a support ticket to respond.
+                                </MudAlert>
+                            }
+                            else
+                           {
+                                <MudText Typo="Typo.subtitle1">
+                                    @selectedTicket.Subject
+                                </MudText>
+                                <MudText Typo="Typo.body2" Class="muted-text mb-4">
+                                    @selectedTicket.StudentName
+                                </MudText>
+                                <MudText Typo="Typo.caption" Class="muted-text">
+                                    @selectedTicket.StudentEmail / @selectedTicket.StudentPhoneNumber
+                                </MudText>
+
+                                <div class="action-row mb-3">
+                                    <MudButton Variant="@(ticketStatus == SupportTicketStatus.InReview ? Variant.Filled : Variant.Outlined)"
+                                               Color="Color.Info"
+                                               OnClick="@(() => ticketStatus = SupportTicketStatus.InReview)">
+                                        In Review
+                                    </MudButton>
+                                    <MudButton Variant="@(ticketStatus == SupportTicketStatus.Resolved ? Variant.Filled : Variant.Outlined)"
+                                               Color="Color.Success"
+                                               OnClick="@(() => ticketStatus = SupportTicketStatus.Resolved)">
+                                        Resolved
+                                    </MudButton>
+                                </div>
+
+                                <MudTextField T="string"
+                                              Label="Mentor response"
+                                              Variant="Variant.Outlined"
+                                              Lines="5"
+                                              @bind-Value="ticketResponse"
+                                              Class="mb-4" />
+
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           FullWidth="true"
+                                           Disabled="@isSaving"
+                                           OnClick="SaveTicketResponseAsync">
+                                    Save Response
+                                </MudButton>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Meetings">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Request Student Meeting</MudText>
+
+                            <MudSelect T="Guid"
+                                       Label="Student"
+                                       Variant="Variant.Outlined"
+                                       @bind-Value="meetingStudentId"
+                                       Class="mb-3">
+                                @foreach (var student in students)
+                               {
+                                    <MudSelectItem T="Guid" Value="@student.StudentId">
+                                        @student.FullName - @student.BatchName
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudTextField T="string"
+                                          Label="Meeting time"
+                                          HelperText="Use format: 2026-06-22 19:00"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="meetingScheduledAt"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Meeting link"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="meetingLink"
+                                          Class="mb-3" />
+
+                            <MudTextField T="string"
+                                          Label="Reason"
+                                          Variant="Variant.Outlined"
+                                          Lines="4"
+                                          @bind-Value="meetingReason"
+                                          Class="mb-4" />
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       Disabled="@isSaving"
+                                       OnClick="CreateMeetingRequestAsync">
+                                Send Meeting Request
+                            </MudButton>
+                        </MudPaper>
+                    </MudItem>
+
+                    <MudItem xs="12" md="8">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Meeting Requests</MudText>
+
+                            <MudStack Spacing="2">
+                                @foreach (var request in meetingRequests)
+                               {
+                                    <MudPaper Class="list-card pa-4">
+                                        <MudStack Row="true"
+                                                  Justify="Justify.SpaceBetween"
+                                                  AlignItems="AlignItems.Start">
+                                            <div>
+                                                <MudText Typo="Typo.subtitle1">@request.StudentName</MudText>
+                                                <MudText Typo="Typo.body2" Class="muted-text">
+                                                    @request.BatchName /
+                                                    @request.ScheduledAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Class="muted-text">
+                                                    Mobile: @request.StudentPhoneNumber
+                                                </MudText>
+                                            </div>
+
+                                            <MudChip T="string" Color="@GetMeetingColor(request.Status)">
+                                                @request.Status
+                                            </MudChip>
+                                        </MudStack>
+
+                                        <MudText Typo="Typo.body2" Class="mt-3">
+                                            @request.Reason
+                                        </MudText>
+
+                                        @if (!string.IsNullOrWhiteSpace(request.StudentResponseNote))
+                                       {
+                                            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-3">
+                                                @request.StudentResponseNote
+                                            </MudAlert>
+                                        }
+
+                                        <div class="action-row mt-3">
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Href="@request.MeetingLink"
+                                                       Target="_blank"
+                                                       Disabled="@string.IsNullOrWhiteSpace(request.MeetingLink)">
+                                                Open Meeting
+                                            </MudButton>
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Warning"
+                                                       Disabled="@isSaving"
+                                                       OnClick="@(() => MarkMeetingCalledAsync(request.Id))">
+                                                Called Student
+                                            </MudButton>
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Success"
+                                                       Disabled="@isSaving"
+                                                       OnClick="@(() => CompleteMeetingAsync(request.Id))">
+                                                Completed
+                                            </MudButton>
+                                        </div>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Attendance Issues">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6" Class="mb-4">Attendance Discrepancies</MudText>
+
+                    <MudStack Spacing="2">
+                        @foreach (var issue in attendanceDiscrepancies)
+                       {
+                            <MudPaper Class="list-card pa-4">
+                                <MudGrid>
+                                    <MudItem xs="12" md="4">
+                                        <MudText Typo="Typo.subtitle1">@issue.StudentName</MudText>
+                                        <MudText Typo="Typo.caption" Class="muted-text">
+                                            @issue.SessionTitle
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="3">
+                                        <MudText Class="metric-label">Status</MudText>
+                                        <MudText Typo="Typo.body2">
+                                            @issue.CurrentStatus -> @issue.RequestedStatus
+                                        </MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="3">
+                                        <MudText Class="metric-label">Reason</MudText>
+                                        <MudText Typo="Typo.body2">@issue.Reason</MudText>
+                                    </MudItem>
+
+                                    <MudItem xs="12" md="2">
+                                        <MudChip T="string" Color="@GetDiscrepancyColor(issue.Status)">
+                                            @issue.Status
+                                        </MudChip>
+                                    </MudItem>
+                                </MudGrid>
+
+                                <div class="action-row mt-3">
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Success"
+                                               Disabled="@isSaving"
+                                               OnClick="@(() => ReviewDiscrepancyAsync(issue.Id, AttendanceDiscrepancyStatus.Approved))">
+                                        Approve
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Error"
+                                               Disabled="@isSaving"
+                                               OnClick="@(() => ReviewDiscrepancyAsync(issue.Id, AttendanceDiscrepancyStatus.Rejected))">
+                                        Reject
+                                    </MudButton>
+                                </div>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                </MudPaper>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Profile">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6" Class="mb-4">Profile & Salary</MudText>
+
+                    @if (mentorProfile == null)
+                   {
+                        <MudAlert Severity="Severity.Warning">Profile is not available.</MudAlert>
+                    }
+                    else
+                   {
+                        <MudGrid>
+                            <MudItem xs="12" md="4">
+                                <MudText Class="metric-label">Name</MudText>
+                                <MudText Typo="Typo.h6">@mentorProfile.FullName</MudText>
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudText Class="metric-label">Email</MudText>
+                                <MudText Typo="Typo.body2">@mentorProfile.Email</MudText>
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudText Class="metric-label">Designation</MudText>
+                                <MudText Typo="Typo.body2">@mentorProfile.Designation</MudText>
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudText Class="metric-label">Phone</MudText>
+                                <MudText Typo="Typo.body2">@mentorProfile.PhoneNumber</MudText>
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudText Class="metric-label">Joined</MudText>
+                                <MudText Typo="Typo.body2">
+                                    @mentorProfile.JoinedDate.ToLocalTime().ToString("dd MMM yyyy")
+                                </MudText>
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudText Class="metric-label">Emergency</MudText>
+                                <MudText Typo="Typo.body2">@mentorProfile.EmergencyContact</MudText>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudDivider Class="my-4" />
+                        <MudText Typo="Typo.subtitle1" Class="mb-3">Salary Slips</MudText>
+
+                        <MudStack Spacing="2">
+                            @foreach (var slip in mentorProfile.SalarySlips)
+                           {
+                                <MudPaper Class="list-card pa-3">
+                                    <MudStack Row="true"
+                                              Justify="Justify.SpaceBetween"
+                                              AlignItems="AlignItems.Center">
+                                        <MudText>@slip.Month/@slip.Year - Net @slip.NetAmount</MudText>
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Primary"
+                                                   Href="@slip.FileUrl"
+                                                   Target="_blank">
+                                            Open
+                                        </MudButton>
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudTabPanel>
+        </MudTabs>
+    }
+</div>
+
+@code{
+    private MentorDashboardModel? dashboard;
+    private List<MentorBatchModel> batches = new();
+    private List<MentorStudentModel> students = new();
+    private List<MentorLessonOptionModel> lessons = new();
+    private List<MentorLiveClassModel> liveClasses = new();
+    private List<MentorAssignmentModel> assignments = new();
+    private List<MentorSubmissionModel> submissions = new();
+    private List<MentorSessionModel> sessions = new();
+    private List<MentorStudentReportModel> studentReports = new();
+    private List<MentorSupportTicketModel> supportTickets = new();
+    private List<MeetingRequestModel> meetingRequests = new();
+    private List<AttendanceDiscrepancyModel> attendanceDiscrepancies = new();
+    private MentorProfileModel? mentorProfile;
+    private MentorAttendanceRosterModel? attendanceRoster;
+    private MentorSubmissionModel? selectedSubmission;
+    private MentorSupportTicketModel? selectedTicket;
+
+    private Guid selectedBatchId;
+    private string statusMessage = string.Empty;
+    private Severity statusSeverity = Severity.Success;
+    private bool isSaving;
+
+    private Guid newLiveClassLessonId;
+    private string newLiveClassScheduledAt =
+        DateTime.Now.AddDays(1).Date.AddHours(19).ToString("yyyy-MM-dd HH:mm");
+    private string newLiveClassMeetingLink = "https://meet.google.com/";
+    private string newLiveClassRecordingLink = string.Empty;
+
+    private Guid newAssignmentBatchId;
+    private Guid newAssignmentLessonId;
+    private string newAssignmentTitle = string.Empty;
+    private string newAssignmentDescription = string.Empty;
+    private string newAssignmentDueAt =
+        DateTime.Now.AddDays(7).Date.AddHours(23).AddMinutes(59)
+            .ToString("yyyy-MM-dd HH:mm");
+    private bool newAssignmentPublished = true;
+
+    private Guid newSessionBatchId;
+    private string newSessionTitle = string.Empty;
+    private string newSessionMeetLink = "https://meet.google.com/";
+    private string newSessionStartTime =
+        DateTime.Now.AddDays(1).Date.AddHours(19).ToString("yyyy-MM-dd HH:mm");
+    private string newSessionEndTime =
+        DateTime.Now.AddDays(1).Date.AddHours(20).AddMinutes(30)
+            .ToString("yyyy-MM-dd HH:mm");
+
+    private Guid weeklyBatchId;
+    private string weeklyStartDate =
+        DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek + 1)
+            .ToString("yyyy-MM-dd");
+    private string weeklyMeetLink = "https://meet.google.com/";
+    private string weeklyStartTime = "19:00";
+    private string weeklyEndTime = "20:30";
+    private bool weeklyMonday = true;
+    private bool weeklyTuesday = true;
+    private bool weeklyWednesday = true;
+    private bool weeklyThursday = true;
+    private bool weeklyFriday = true;
+
+    private AssignmentSubmissionStatus reviewStatus =
+        AssignmentSubmissionStatus.Reviewed;
+    private string reviewFeedback = string.Empty;
+
+    private SupportTicketStatus ticketStatus = SupportTicketStatus.InReview;
+    private int OpenSupportCount => supportTickets.Count(x =>
+        x.Status != SupportTicketStatus.Resolved);
+    private string ticketResponse = string.Empty;
+
+    private IEnumerable<MentorBatchModel> FilteredBatches =>
+        selectedBatchId == Guid.Empty
+            ? batches
+            : batches.Where(x => x.BatchId == selectedBatchId);
+
+    private IEnumerable<MentorStudentModel> FilteredStudents =>
+        selectedBatchId == Guid.Empty
+            ? students
+            : students.Where(x => x.BatchId == selectedBatchId);
+
+    private IEnumerable<MentorStudentReportModel> FilteredStudentReports =>
+        selectedBatchId == Guid.Empty
+            ? studentReports
+            : studentReports.Where(x => x.BatchId == selectedBatchId);
+
+    private IEnumerable<MentorAssignmentModel> FilteredAssignments =>
+        selectedBatchId == Guid.Empty
+            ? assignments
+            : assignments.Where(x => x.BatchId == selectedBatchId);
+
+    private IEnumerable<MentorSubmissionModel> FilteredSubmissions =>
+        selectedBatchId == Guid.Empty
+            ? submissions
+            : submissions.Where(x => x.BatchId == selectedBatchId);
+
+    private IEnumerable<MentorSessionModel> FilteredSessions =>
+        selectedBatchId == Guid.Empty
+            ? sessions
+            : sessions.Where(x => x.BatchId == selectedBatchId);
+
+    private IEnumerable<MentorSupportTicketModel> FilteredSupportTickets =>
+        selectedBatchId == Guid.Empty
+            ? supportTickets
+            : supportTickets.Where(x => x.BatchId == selectedBatchId);
+
+    private Guid meetingStudentId;
+    private string meetingScheduledAt =
+        DateTime.Now.AddDays(1).Date.AddHours(18).ToString("yyyy-MM-dd HH:mm");
+    private string meetingLink = "https://meet.google.com/";
+    private string meetingReason = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        await LoadAllAsync();
+
+        StateHasChanged();
+    }
+
+    private async Task RefreshAsync()
+   {
+        await LoadAllAsync(true);
+    }
+
+    private async Task LoadAllAsync(bool showRefreshStatus = false)
+   {
+        dashboard = await MentorService.GetDashboardAsync();
+
+        if (dashboard == null)
+       {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        batches = await MentorService.GetBatchesAsync();
+        students = await MentorService.GetStudentsAsync();
+        lessons = await MentorService.GetLessonsAsync();
+        liveClasses = await MentorService.GetLiveClassesAsync();
+        assignments = await MentorService.GetAssignmentsAsync();
+        submissions = await MentorService.GetSubmissionsAsync();
+        sessions = await MentorService.GetSessionsAsync();
+        studentReports = await MentorService.GetStudentReportsAsync();
+        supportTickets = await MentorService.GetSupportTicketsAsync();
+        meetingRequests = await OperationsService.GetMentorMeetingRequestsAsync();
+        attendanceDiscrepancies =
+            await OperationsService.GetMentorAttendanceDiscrepanciesAsync();
+        mentorProfile = await OperationsService.GetMentorProfileAsync();
+
+        newAssignmentBatchId = batches.FirstOrDefault()?.BatchId ?? Guid.Empty;
+        newSessionBatchId = newAssignmentBatchId;
+        weeklyBatchId = newAssignmentBatchId;
+        newLiveClassLessonId = lessons.FirstOrDefault()?.LessonId ?? Guid.Empty;
+        meetingStudentId = students.FirstOrDefault()?.StudentId ?? Guid.Empty;
+
+        if (showRefreshStatus)
+       {
+            ShowStatus("Dashboard refreshed.", Severity.Success);
+        }
+    }
+
+    private static string GetAssignmentOwner(MentorAssignmentModel assignment)
+   {
+        if (string.IsNullOrWhiteSpace(assignment.CreatedByName) &&
+            string.IsNullOrWhiteSpace(assignment.SourceRole))
+       {
+            return "Created by system";
+        }
+
+        if (string.IsNullOrWhiteSpace(assignment.SourceRole))
+       {
+            return $"Created by{assignment.CreatedByName}";
+        }
+
+        return $"Created by{assignment.CreatedByName} ({GetRoleLabel(assignment.SourceRole)})";
+    }
+
+    private async Task CreateLiveClassAsync()
+   {
+        if (newLiveClassLessonId == Guid.Empty ||
+            !TryParseDate(newLiveClassScheduledAt, out var scheduledAt) ||
+            string.IsNullOrWhiteSpace(newLiveClassMeetingLink))
+       {
+            ShowStatus("Lesson, valid schedule time, and meeting link are required.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var created = await MentorService.CreateLiveClassAsync(
+            new CreateMentorLiveClassModel
+           {
+                LessonId = newLiveClassLessonId,
+                ScheduledAt = scheduledAt.ToUniversalTime(),
+                MeetingLink = newLiveClassMeetingLink,
+                RecordingLink = newLiveClassRecordingLink
+            });
+
+        isSaving = false;
+
+        if (created == null)
+       {
+            ShowStatus("Class could not be scheduled.", Severity.Error);
+            return;
+        }
+
+        liveClasses = await MentorService.GetLiveClassesAsync();
+        dashboard = await MentorService.GetDashboardAsync();
+        newLiveClassRecordingLink = string.Empty;
+        ShowStatus("Live class scheduled.", Severity.Success);
+    }
+
+    private async Task DeleteLiveClassAsync(Guid liveClassId)
+   {
+        isSaving = true;
+
+        var deleted = await MentorService.DeleteLiveClassAsync(liveClassId);
+
+        isSaving = false;
+
+        if (!deleted)
+       {
+            ShowStatus("Live class could not be deleted.", Severity.Error);
+            return;
+        }
+
+        liveClasses = await MentorService.GetLiveClassesAsync();
+        dashboard = await MentorService.GetDashboardAsync();
+        ShowStatus("Live class deleted.", Severity.Success);
+    }
+
+    private async Task CreateAssignmentAsync()
+   {
+        if (newAssignmentBatchId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(newAssignmentTitle) ||
+            !TryParseDate(newAssignmentDueAt, out var dueAt))
+       {
+            ShowStatus("Batch, title, and valid due date are required.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var created = await MentorService.CreateAssignmentAsync(
+            new CreateMentorAssignmentModel
+           {
+                BatchId = newAssignmentBatchId,
+                LessonId = newAssignmentLessonId == Guid.Empty
+                    ? null
+                    : newAssignmentLessonId,
+                Title = newAssignmentTitle,
+                Description = newAssignmentDescription,
+                DueAt = dueAt.ToUniversalTime(),
+                IsPublished = newAssignmentPublished
+            });
+
+        isSaving = false;
+
+        if (created == null)
+       {
+            ShowStatus("Assignment could not be created.", Severity.Error);
+            return;
+        }
+
+        assignments = await MentorService.GetAssignmentsAsync();
+        dashboard = await MentorService.GetDashboardAsync();
+        newAssignmentTitle = string.Empty;
+        newAssignmentDescription = string.Empty;
+        ShowStatus("Assignment created.", Severity.Success);
+    }
+
+    private async Task DeleteAssignmentAsync(Guid assignmentId)
+   {
+        isSaving = true;
+
+        var deleted = await MentorService.DeleteAssignmentAsync(assignmentId);
+
+        isSaving = false;
+
+        if (!deleted)
+       {
+            ShowStatus("Assignment could not be deleted.", Severity.Error);
+            return;
+        }
+
+        assignments = await MentorService.GetAssignmentsAsync();
+        submissions = await MentorService.GetSubmissionsAsync();
+        dashboard = await MentorService.GetDashboardAsync();
+
+        if (selectedSubmission?.AssignmentId == assignmentId)
+       {
+            selectedSubmission = null;
+        }
+
+        ShowStatus("Assignment deleted.", Severity.Success);
+    }
+
+    private void SelectSubmission(MentorSubmissionModel submission)
+   {
+        selectedSubmission = submission;
+        reviewStatus = submission.Status == AssignmentSubmissionStatus.RevisionRequested
+            ? AssignmentSubmissionStatus.RevisionRequested
+            : AssignmentSubmissionStatus.Reviewed;
+        reviewFeedback = submission.Feedback;
+    }
+
+    private async Task SaveSubmissionReviewAsync()
+   {
+        if (selectedSubmission == null)
+       {
+            return;
+        }
+
+        isSaving = true;
+
+        var updated = await MentorService.ReviewSubmissionAsync(
+            selectedSubmission.SubmissionId,
+            new ReviewAssignmentSubmissionModel
+           {
+                Status = reviewStatus,
+                Feedback = reviewFeedback
+            });
+
+        isSaving = false;
+
+        if (updated == null)
+       {
+            ShowStatus("Submission review could not be saved.", Severity.Error);
+            return;
+        }
+
+        submissions = await MentorService.GetSubmissionsAsync();
+        assignments = await MentorService.GetAssignmentsAsync();
+        dashboard = await MentorService.GetDashboardAsync();
+        selectedSubmission = updated;
+        ShowStatus("Submission review saved.", Severity.Success);
+    }
+
+    private async Task CreateSessionAsync()
+   {
+        if (newSessionBatchId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(newSessionTitle) ||
+            !TryParseDate(newSessionStartTime, out var startTime) ||
+            !TryParseDate(newSessionEndTime, out var endTime))
+       {
+            ShowStatus("Batch, title, start time, and end time are required.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var created = await MentorService.CreateSessionAsync(
+            new CreateMentorSessionModel
+           {
+                BatchId = newSessionBatchId,
+                Title = newSessionTitle,
+                MeetLink = newSessionMeetLink,
+                StartTime = startTime.ToUniversalTime(),
+                EndTime = endTime.ToUniversalTime()
+            });
+
+        isSaving = false;
+
+        if (created == null)
+       {
+            ShowStatus("Session could not be created.", Severity.Error);
+            return;
+        }
+
+        sessions = await MentorService.GetSessionsAsync();
+        dashboard = await MentorService.GetDashboardAsync();
+        newSessionTitle = string.Empty;
+        ShowStatus("Session created.", Severity.Success);
+    }
+
+    private async Task CreateWeeklySessionsAsync()
+   {
+        var days = GetSelectedWeeklyDays();
+
+        if (weeklyBatchId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(weeklyMeetLink) ||
+            !DateTime.TryParse(weeklyStartDate, out var weekStart) ||
+            !TimeSpan.TryParse(weeklyStartTime, out var startTime) ||
+            !TimeSpan.TryParse(weeklyEndTime, out var endTime) ||
+            days.Count == 0 ||
+            endTime <= startTime)
+       {
+            ShowStatus("Batch, week start, link, valid time, and at least one day are required.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var created = await MentorService.CreateWeeklySessionsAsync(
+            new CreateMentorWeeklySessionsModel
+           {
+                BatchId = weeklyBatchId,
+                WeekStartDate = weekStart.Date,
+                TitlePrefix = "Live Class",
+                MeetLink = weeklyMeetLink,
+                StartTime = startTime,
+                EndTime = endTime,
+                Days = days
+            });
+
+        isSaving = false;
+
+        if (created.Count == 0)
+       {
+            ShowStatus("Weekly live links could not be uploaded.", Severity.Error);
+            return;
+        }
+
+        sessions = await MentorService.GetSessionsAsync();
+        dashboard = await MentorService.GetDashboardAsync();
+        ShowStatus($"{created.Count} weekly live links uploaded.", Severity.Success);
+    }
+
+    private async Task DeleteSessionAsync(Guid sessionId)
+   {
+        isSaving = true;
+
+        var deleted = await MentorService.DeleteSessionAsync(sessionId);
+
+        isSaving = false;
+
+        if (!deleted)
+       {
+            ShowStatus("Session could not be deleted.", Severity.Error);
+            return;
+        }
+
+        sessions = await MentorService.GetSessionsAsync();
+        students = await MentorService.GetStudentsAsync();
+        batches = await MentorService.GetBatchesAsync();
+        dashboard = await MentorService.GetDashboardAsync();
+
+        if (attendanceRoster?.SessionId == sessionId)
+       {
+            attendanceRoster = null;
+        }
+
+        ShowStatus("Session deleted.", Severity.Success);
+    }
+
+    private async Task LoadRosterAsync(Guid sessionId)
+   {
+        attendanceRoster = await MentorService.GetAttendanceRosterAsync(sessionId);
+
+        if (attendanceRoster == null)
+       {
+            ShowStatus("Attendance roster could not be loaded.", Severity.Error);
+        }
+    }
+
+    private async Task SaveAttendanceAsync()
+   {
+        if (attendanceRoster == null)
+       {
+            return;
+        }
+
+        var records = attendanceRoster.Students
+            .Where(x => x.Status.HasValue)
+            .Select(x => new MarkMentorAttendanceEntryModel
+           {
+                StudentId = x.StudentId,
+                Status = x.Status!.Value
+            })
+            .ToList();
+
+        isSaving = true;
+
+        var updated = await MentorService.MarkAttendanceAsync(
+            attendanceRoster.SessionId,
+            new MarkMentorAttendanceModel{ Records = records });
+
+        isSaving = false;
+
+        if (updated == null)
+       {
+            ShowStatus("Attendance could not be saved.", Severity.Error);
+            return;
+        }
+
+        attendanceRoster = updated;
+        sessions = await MentorService.GetSessionsAsync();
+        students = await MentorService.GetStudentsAsync();
+        batches = await MentorService.GetBatchesAsync();
+        ShowStatus("Attendance saved.", Severity.Success);
+    }
+
+    private void SetRosterStatus(AttendanceStatus status)
+   {
+        if (attendanceRoster == null)
+       {
+            return;
+        }
+
+        foreach (var entry in attendanceRoster.Students)
+       {
+            entry.Status = status;
+        }
+    }
+
+    private void SetUnmarkedAbsent()
+   {
+        if (attendanceRoster == null)
+       {
+            return;
+        }
+
+        foreach (var entry in attendanceRoster.Students.Where(x => !x.Status.HasValue))
+       {
+            entry.Status = AttendanceStatus.Absent;
+        }
+    }
+
+    private void SelectTicket(MentorSupportTicketModel ticket)
+   {
+        selectedTicket = ticket;
+        ticketStatus = ticket.Status == SupportTicketStatus.Resolved
+            ? SupportTicketStatus.Resolved
+            : SupportTicketStatus.InReview;
+        ticketResponse = ticket.MentorResponse;
+    }
+
+    private async Task RefreshSupportTicketsAsync()
+   {
+        supportTickets = await MentorService.GetSupportTicketsAsync();
+        dashboard = await MentorService.GetDashboardAsync();
+
+        if (selectedTicket != null)
+       {
+            selectedTicket = supportTickets.FirstOrDefault(x =>
+                x.Id == selectedTicket.Id);
+        }
+
+        ShowStatus("Student requests refreshed.", Severity.Success);
+    }
+
+    private async Task SaveTicketResponseAsync()
+   {
+        if (selectedTicket == null)
+       {
+            return;
+        }
+
+        isSaving = true;
+
+        var updated = await MentorService.RespondToSupportTicketAsync(
+            selectedTicket.Id,
+            new RespondSupportTicketModel
+           {
+                Status = ticketStatus,
+                MentorResponse = ticketResponse
+            });
+
+        isSaving = false;
+
+        if (updated == null)
+       {
+            ShowStatus("Support response could not be saved.", Severity.Error);
+            return;
+        }
+
+        supportTickets = await MentorService.GetSupportTicketsAsync();
+        dashboard = await MentorService.GetDashboardAsync();
+        selectedTicket = updated;
+        ShowStatus("Support response saved.", Severity.Success);
+    }
+
+    private async Task CreateMeetingRequestAsync()
+   {
+        if (meetingStudentId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(meetingReason) ||
+            !TryParseDate(meetingScheduledAt, out var scheduledAt))
+       {
+            ShowStatus("Student, meeting time, and reason are required.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var created = await OperationsService.CreateMeetingRequestAsync(
+            new CreateMeetingRequestModel
+           {
+                StudentId = meetingStudentId,
+                ScheduledAt = scheduledAt.ToUniversalTime(),
+                MeetingLink = meetingLink,
+                Reason = meetingReason
+            });
+
+        isSaving = false;
+
+        if (created == null)
+       {
+            ShowStatus("Meeting request could not be sent.", Severity.Error);
+            return;
+        }
+
+        meetingRequests = await OperationsService.GetMentorMeetingRequestsAsync();
+        meetingReason = string.Empty;
+        ShowStatus("Meeting request sent to student.", Severity.Success);
+    }
+
+    private Task MarkMeetingCalledAsync(Guid meetingRequestId)
+   {
+        return UpdateMeetingStatusAsync(
+            meetingRequestId,
+            MeetingRequestStatus.Called,
+            "Student did not respond; called the registered mobile number.");
+    }
+
+    private Task CompleteMeetingAsync(Guid meetingRequestId)
+   {
+        return UpdateMeetingStatusAsync(
+            meetingRequestId,
+            MeetingRequestStatus.Completed,
+            "Meeting completed.");
+    }
+
+    private async Task UpdateMeetingStatusAsync(
+        Guid meetingRequestId,
+        MeetingRequestStatus status,
+        string note)
+   {
+        isSaving = true;
+
+        var updated = await OperationsService.UpdateMeetingFollowUpAsync(
+            meetingRequestId,
+            new UpdateMeetingFollowUpModel
+           {
+                Status = status,
+                MentorFollowUpNote = note
+            });
+
+        isSaving = false;
+
+        if (updated == null)
+       {
+            ShowStatus("Meeting request could not be updated.", Severity.Error);
+            return;
+        }
+
+        meetingRequests = await OperationsService.GetMentorMeetingRequestsAsync();
+        ShowStatus("Meeting request updated.", Severity.Success);
+    }
+
+    private async Task ReviewDiscrepancyAsync(
+        Guid discrepancyId,
+        AttendanceDiscrepancyStatus status)
+   {
+        isSaving = true;
+
+        var updated = await OperationsService.ReviewAttendanceDiscrepancyAsync(
+            discrepancyId,
+            new ReviewAttendanceDiscrepancyModel
+           {
+                Status = status,
+                ResolutionNote = status == AttendanceDiscrepancyStatus.Approved
+                    ? "Attendance corrected."
+                    : "Attendance report rejected."
+            });
+
+        isSaving = false;
+
+        if (updated == null)
+       {
+            ShowStatus("Attendance issue could not be reviewed.", Severity.Error);
+            return;
+        }
+
+        attendanceDiscrepancies =
+            await OperationsService.GetMentorAttendanceDiscrepanciesAsync();
+        sessions = await MentorService.GetSessionsAsync();
+        students = await MentorService.GetStudentsAsync();
+        studentReports = await MentorService.GetStudentReportsAsync();
+        ShowStatus("Attendance issue reviewed.", Severity.Success);
+    }
+
+    private void ShowStatus(string message, Severity severity)
+   {
+        statusMessage = message;
+        statusSeverity = severity;
+        Snackbar.Add(message, severity);
+    }
+
+    private static bool TryParseDate(string value, out DateTime result)
+   {
+        return DateTime.TryParse(value, out result);
+    }
+
+    private List<DayOfWeek> GetSelectedWeeklyDays()
+   {
+        var days = new List<DayOfWeek>();
+
+        if (weeklyMonday)
+       {
+            days.Add(DayOfWeek.Monday);
+        }
+
+        if (weeklyTuesday)
+       {
+            days.Add(DayOfWeek.Tuesday);
+        }
+
+        if (weeklyWednesday)
+       {
+            days.Add(DayOfWeek.Wednesday);
+        }
+
+        if (weeklyThursday)
+       {
+            days.Add(DayOfWeek.Thursday);
+        }
+
+        if (weeklyFriday)
+       {
+            days.Add(DayOfWeek.Friday);
+        }
+
+        return days;
+    }
+
+    private static string GetRoleLabel(string role)
+   {
+        return role switch
+       {
+            "AssistantMentor" => "Assistant Mentor",
+            "MainMentor" => "Main Mentor",
+            _ => role
+        };
+    }
+
+    private static Color GetAttendanceColor(decimal value)
+   {
+        if (value >= 85)
+       {
+            return Color.Success;
+        }
+
+        return value >= 70 ? Color.Warning : Color.Error;
+    }
+
+    private static Color GetSubmissionColor(AssignmentSubmissionStatus status)
+   {
+        return status switch
+       {
+            AssignmentSubmissionStatus.Reviewed => Color.Success,
+            AssignmentSubmissionStatus.RevisionRequested => Color.Warning,
+            AssignmentSubmissionStatus.Submitted => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetSupportColor(SupportTicketStatus status)
+   {
+        return status switch
+       {
+            SupportTicketStatus.Resolved => Color.Success,
+            SupportTicketStatus.InReview => Color.Info,
+            _ => Color.Warning
+        };
+    }
+
+    private static Color GetMeetingColor(MeetingRequestStatus status)
+   {
+        return status switch
+       {
+            MeetingRequestStatus.Accepted => Color.Success,
+            MeetingRequestStatus.Completed => Color.Success,
+            MeetingRequestStatus.Called => Color.Warning,
+            MeetingRequestStatus.Rejected => Color.Error,
+            _ => Color.Info
+        };
+    }
+
+    private static Color GetDiscrepancyColor(AttendanceDiscrepancyStatus status)
+   {
+        return status switch
+       {
+            AttendanceDiscrepancyStatus.Approved => Color.Success,
+            AttendanceDiscrepancyStatus.Rejected => Color.Error,
+            AttendanceDiscrepancyStatus.InReview => Color.Info,
+            _ => Color.Warning
+        };
+    }
+}

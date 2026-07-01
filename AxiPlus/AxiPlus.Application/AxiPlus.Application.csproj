@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AxiPlus.Domain\AxiPlus.Domain.csproj" />
+    <ProjectReference Include="..\..\AxiCore.Shared\AxiCore.Contracts\AxiCore.Contracts.csproj" />
+    <ProjectReference Include="..\..\AxiCore.Shared\AxiCore.Diagnostics\AxiCore.Diagnostics.csproj" />
+    <ProjectReference Include="..\..\AxiCore.Shared\AxiCore.Security\AxiCore.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.8" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="7.6.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.2" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,28 @@
+﻿@using AxiPlus.Web.Components
+@using AxiPlus.Web.Components.Layout
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["AxiPlus.Web.styles.css"]" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+
+    <link href="css/dashboard-v2.css" rel="stylesheet" />
+</head>
+
+<body>
+    <HeadOutlet @rendermode="InteractiveServer" />
+    <Routes @rendermode="InteractiveServer" />
+    <script src="_framework/blazor.web.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="auth.js"></script>
+</body>
+
+</html>

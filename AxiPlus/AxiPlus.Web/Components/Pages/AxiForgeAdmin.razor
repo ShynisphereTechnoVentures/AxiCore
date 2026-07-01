@@ -1,0 +1,665 @@
+@page "/admin/axiforge"
+
+@using System.Text.Json
+@using AxiPlus.Web.Models.AdminPortal
+@using AxiPlus.Web.Services
+@using MudBlazor
+
+@inject AdminPortalApiService AdminService
+@inject ISnackbar Snackbar
+
+<PageTitle>AxiForge Admin</PageTitle>
+
+<div class="page-shell">
+    <div class="page-header">
+        <div>
+            <MudText Typo="Typo.h4">AxiForge Content</MudText>
+            <MudText Typo="Typo.body2">Author database-driven coding practice, roadmaps, and MCQ assessments.</MudText>
+        </div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadAsync">Refresh</MudButton>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-state">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else
+    {
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="4">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Problems</MudText>
+                    <MudText Class="metric-value">@problems.Count</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Roadmaps</MudText>
+                    <MudText Class="metric-value">@roadmaps.Count</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Class="metric-card pa-4">
+                    <MudText Class="metric-label">Mappings</MudText>
+                    <MudText Class="metric-value">@lessonMappings.Count</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudTabs Elevation="0" Rounded="true" PanelClass="pt-4">
+            <MudTabPanel Text="Problems">
+                <MudGrid>
+                    <MudItem xs="12" md="5">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Problem Statement</MudText>
+                            <MudTextField T="string" Label="Title" Variant="Variant.Outlined" @bind-Value="problemForm.Title" Class="mb-3" />
+                            <MudTextField T="string" Label="Slug" Variant="Variant.Outlined" @bind-Value="problemForm.Slug" Class="mb-3" />
+                            <MudGrid>
+                                <MudItem xs="12" sm="6">
+                                    <MudTextField T="string" Label="Topic" Variant="Variant.Outlined" @bind-Value="problemForm.Topic" Class="mb-3" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudSelect T="string" Label="Difficulty" Variant="Variant.Outlined" @bind-Value="problemForm.Difficulty" Class="mb-3">
+                                        <MudSelectItem T="string" Value="@("Easy")">Easy</MudSelectItem>
+                                        <MudSelectItem T="string" Value="@("Medium")">Medium</MudSelectItem>
+                                        <MudSelectItem T="string" Value="@("Hard")">Hard</MudSelectItem>
+                                    </MudSelect>
+                                </MudItem>
+                            </MudGrid>
+                            <MudTextField T="string" Label="Tags / topics" Variant="Variant.Outlined" @bind-Value="problemForm.Tags" Class="mb-3" />
+                            <MudTextField T="string" Label="Problem statement (Markdown/HTML)" Variant="Variant.Outlined" Lines="8" @bind-Value="problemForm.Description" Class="mb-3" />
+                            <MudTextField T="string" Label="Input format" Variant="Variant.Outlined" Lines="3" @bind-Value="problemForm.InputFormat" Class="mb-3" />
+                            <MudTextField T="string" Label="Output format" Variant="Variant.Outlined" Lines="3" @bind-Value="problemForm.OutputFormat" Class="mb-3" />
+                            <MudTextField T="string" Label="Constraints" Variant="Variant.Outlined" Lines="4" @bind-Value="problemForm.Constraints" Class="mb-3" />
+                            <MudTextField T="string" Label="Examples" Variant="Variant.Outlined" Lines="5" @bind-Value="problemForm.Examples" Class="mb-3" />
+                            <MudTextField T="string" Label="Explanation" Variant="Variant.Outlined" Lines="4" @bind-Value="problemForm.Explanation" Class="mb-3" />
+                            <MudTextField T="string" Label="Default starter code" Variant="Variant.Outlined" Lines="5" @bind-Value="problemForm.StarterCode" Class="mb-3" />
+                            <MudTextField T="string" Label="Starter code per language JSON" Variant="Variant.Outlined" Lines="8" @bind-Value="problemForm.StarterCodeByLanguage" Class="mb-3" />
+                            <MudTextField T="string" Label="Expected output note" Variant="Variant.Outlined" @bind-Value="problemForm.ExpectedOutput" Class="mb-3" />
+                            <MudGrid>
+                                <MudItem xs="12" sm="6">
+                                    <MudNumericField T="int" Label="Time limit (ms)" Variant="Variant.Outlined" @bind-Value="problemForm.TimeLimitMilliseconds" Class="mb-3" />
+                                </MudItem>
+                                <MudItem xs="12" sm="6">
+                                    <MudNumericField T="int" Label="Memory limit (KB)" Variant="Variant.Outlined" @bind-Value="problemForm.MemoryLimitKb" Class="mb-3" />
+                                </MudItem>
+                            </MudGrid>
+                            <MudSwitch T="bool" Label="Published" @bind-Value="problemForm.IsPublished" Class="mb-3" />
+
+                            <MudDivider Class="my-4" />
+                            <MudText Typo="Typo.subtitle1" Class="mb-3">Test Cases</MudText>
+                            @foreach (var testCase in problemForm.TestCases)
+                            {
+                                <MudPaper Class="list-card pa-3 mb-3">
+                                    <MudTextField T="string" Label="Input" Variant="Variant.Outlined" @bind-Value="testCase.Input" Class="mb-2" />
+                                    <MudTextField T="string" Label="Expected output" Variant="Variant.Outlined" @bind-Value="testCase.ExpectedOutput" Class="mb-2" />
+                                    <MudGrid>
+                                        <MudItem xs="6">
+                                            <MudNumericField T="int" Label="Order" Variant="Variant.Outlined" @bind-Value="testCase.Order" />
+                                        </MudItem>
+                                        <MudItem xs="6">
+                                            <MudSwitch T="bool" Label="Hidden" @bind-Value="testCase.IsHidden" />
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudPaper>
+                            }
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="AddProblemTestCase" Class="mr-2">Add Test Case</MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@isSaving" OnClick="SaveProblemAsync">Save Problem</MudButton>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="7">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Problem Bank</MudText>
+                            @foreach (var problem in problems)
+                            {
+                                <MudPaper Class="list-card pa-4 mb-3">
+                                    <MudGrid>
+                                        <MudItem xs="12" md="7">
+                                            <MudText Typo="Typo.subtitle1">@problem.Title</MudText>
+                                            <MudText Typo="Typo.caption" Class="muted-text">@problem.Topic - @problem.Difficulty - @problem.Tags - @problem.TestCases.Count test case(s)</MudText>
+                                        </MudItem>
+                                        <MudItem xs="12" md="2">
+                                            <MudChip T="string" Color="@(problem.IsPublished ? Color.Success : Color.Default)">@(problem.IsPublished ? "Published" : "Draft")</MudChip>
+                                        </MudItem>
+                                        <MudItem xs="12" md="3">
+                                            <MudButton Variant="Variant.Outlined" OnClick="@(() => EditProblem(problem))">Edit</MudButton>
+                                            <MudButton Variant="Variant.Text" Color="Color.Warning" OnClick="@(() => ArchiveProblemAsync(problem.Id))">Archive</MudButton>
+                                            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="@(() => DeleteProblemAsync(problem.Id))">Delete</MudButton>
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudPaper>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Roadmaps">
+                <MudGrid>
+                    <MudItem xs="12" md="5">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Roadmap</MudText>
+                            <MudTextField T="string" Label="Title" Variant="Variant.Outlined" @bind-Value="roadmapForm.Title" Class="mb-3" />
+                            <MudTextField T="string" Label="Slug" Variant="Variant.Outlined" @bind-Value="roadmapForm.Slug" Class="mb-3" />
+                            <MudTextField T="string" Label="Level" Variant="Variant.Outlined" @bind-Value="roadmapForm.Level" Class="mb-3" />
+                            <MudTextField T="string" Label="Description" Variant="Variant.Outlined" Lines="3" @bind-Value="roadmapForm.Description" Class="mb-3" />
+                            <MudSwitch T="bool" Label="Published" @bind-Value="roadmapForm.IsPublished" Class="mb-3" />
+                            <MudDivider Class="my-4" />
+                            <MudText Typo="Typo.subtitle1" Class="mb-3">Steps</MudText>
+                            @foreach (var step in roadmapForm.Steps)
+                            {
+                                <MudPaper Class="list-card pa-3 mb-3">
+                                    <MudTextField T="string" Label="Step title" Variant="Variant.Outlined" @bind-Value="step.Title" Class="mb-2" />
+                                    <MudTextField T="string" Label="Description" Variant="Variant.Outlined" @bind-Value="step.Description" Class="mb-2" />
+                                    <MudNumericField T="int" Label="Order" Variant="Variant.Outlined" @bind-Value="step.Order" />
+                                </MudPaper>
+                            }
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="AddRoadmapStep" Class="mr-2">Add Step</MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@isSaving" OnClick="SaveRoadmapAsync">Save Roadmap</MudButton>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="7">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Published Study Plans</MudText>
+                            @foreach (var roadmap in roadmaps)
+                            {
+                                <MudPaper Class="list-card pa-4 mb-3">
+                                    <MudText Typo="Typo.subtitle1">@roadmap.Title</MudText>
+                                    <MudText Typo="Typo.caption" Class="muted-text">@roadmap.Level - @roadmap.Steps.Count step(s)</MudText>
+                                    <MudButton Variant="Variant.Outlined" Class="mt-3" OnClick="@(() => EditRoadmap(roadmap))">Edit</MudButton>
+                                    <MudButton Variant="Variant.Text" Color="Color.Warning" Class="mt-3" OnClick="@(() => ArchiveRoadmapAsync(roadmap.Id))">Archive</MudButton>
+                                    <MudButton Variant="Variant.Text" Color="Color.Error" Class="mt-3" OnClick="@(() => DeleteRoadmapAsync(roadmap.Id))">Delete</MudButton>
+                                </MudPaper>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="MCQ Assessments">
+                <MudGrid>
+                    <MudItem xs="12" md="5">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Assessment</MudText>
+                            <MudTextField T="string" Label="Title" Variant="Variant.Outlined" @bind-Value="assessmentForm.Title" Class="mb-3" />
+                            <MudTextField T="string" Label="Slug" Variant="Variant.Outlined" @bind-Value="assessmentForm.Slug" Class="mb-3" />
+                            <MudTextField T="string" Label="Description" Variant="Variant.Outlined" Lines="3" @bind-Value="assessmentForm.Description" Class="mb-3" />
+                            <MudGrid>
+                                <MudItem xs="6">
+                                    <MudNumericField T="int" Label="Duration" Variant="Variant.Outlined" @bind-Value="assessmentForm.DurationMinutes" />
+                                </MudItem>
+                                <MudItem xs="6">
+                                    <MudNumericField T="int" Label="Passing score" Variant="Variant.Outlined" @bind-Value="assessmentForm.PassingScore" />
+                                </MudItem>
+                            </MudGrid>
+                            <MudSwitch T="bool" Label="Published" @bind-Value="assessmentForm.IsPublished" Class="my-3" />
+                            <MudDivider Class="my-4" />
+                            <MudText Typo="Typo.subtitle1" Class="mb-3">Questions</MudText>
+                            @foreach (var question in assessmentForm.Questions)
+                            {
+                                <MudPaper Class="list-card pa-3 mb-3">
+                                    <MudTextField T="string" Label="Prompt" Variant="Variant.Outlined" @bind-Value="question.Prompt" Class="mb-2" />
+                                    <MudTextField T="string" Label="Option A" Variant="Variant.Outlined" @bind-Value="question.OptionA" Class="mb-2" />
+                                    <MudTextField T="string" Label="Option B" Variant="Variant.Outlined" @bind-Value="question.OptionB" Class="mb-2" />
+                                    <MudTextField T="string" Label="Option C" Variant="Variant.Outlined" @bind-Value="question.OptionC" Class="mb-2" />
+                                    <MudTextField T="string" Label="Option D" Variant="Variant.Outlined" @bind-Value="question.OptionD" Class="mb-2" />
+                                    <MudGrid>
+                                        <MudItem xs="6">
+                                            <MudSelect T="string" Label="Correct" Variant="Variant.Outlined" @bind-Value="question.CorrectOption">
+                                                <MudSelectItem T="string" Value="@("A")">A</MudSelectItem>
+                                                <MudSelectItem T="string" Value="@("B")">B</MudSelectItem>
+                                                <MudSelectItem T="string" Value="@("C")">C</MudSelectItem>
+                                                <MudSelectItem T="string" Value="@("D")">D</MudSelectItem>
+                                            </MudSelect>
+                                        </MudItem>
+                                        <MudItem xs="6">
+                                            <MudNumericField T="int" Label="Order" Variant="Variant.Outlined" @bind-Value="question.Order" />
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudPaper>
+                            }
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="AddAssessmentQuestion" Class="mr-2">Add Question</MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@isSaving" OnClick="SaveAssessmentAsync">Save Assessment</MudButton>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="7">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Assessments</MudText>
+                            @foreach (var assessment in assessments)
+                            {
+                                <MudPaper Class="list-card pa-4 mb-3">
+                                    <MudText Typo="Typo.subtitle1">@assessment.Title</MudText>
+                                    <MudText Typo="Typo.caption" Class="muted-text">@assessment.DurationMinutes min - @assessment.PassingScore% pass - @assessment.Questions.Count question(s)</MudText>
+                                    <MudButton Variant="Variant.Outlined" Class="mt-3" OnClick="@(() => EditAssessment(assessment))">Edit</MudButton>
+                                    <MudButton Variant="Variant.Text" Color="Color.Warning" Class="mt-3" OnClick="@(() => ArchiveAssessmentAsync(assessment.Id))">Archive</MudButton>
+                                    <MudButton Variant="Variant.Text" Color="Color.Error" Class="mt-3" OnClick="@(() => DeleteAssessmentAsync(assessment.Id))">Delete</MudButton>
+                                </MudPaper>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Lesson Mappings">
+                <MudGrid>
+                    <MudItem xs="12" md="5">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Map AxiPlus Lesson To Problem</MudText>
+                            <MudSelect T="Guid" Label="AxiPlus lesson" Variant="Variant.Outlined" @bind-Value="mappingForm.SourceLessonId" Class="mb-3">
+                                @foreach (var lesson in lessons)
+                                {
+                                    <MudSelectItem T="Guid" Value="@lesson.Id">@lesson.ModuleTitle - @lesson.Title</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudSelect T="Guid" Label="AxiForge problem" Variant="Variant.Outlined" @bind-Value="mappingForm.ProblemId" Class="mb-3">
+                                @foreach (var problem in problems)
+                                {
+                                    <MudSelectItem T="Guid" Value="@problem.Id">@problem.Topic - @problem.Title</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudTextField T="string" Label="Source product" Variant="Variant.Outlined" @bind-Value="mappingForm.SourceProduct" Class="mb-3" />
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@isSaving" OnClick="SaveLessonMappingAsync">Save Mapping</MudButton>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="7">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Active Mappings</MudText>
+                            @foreach (var mapping in lessonMappings)
+                            {
+                                <MudPaper Class="list-card pa-4 mb-3">
+                                    <MudText Typo="Typo.subtitle1">@mapping.SourceLessonTitle</MudText>
+                                    <MudText Typo="Typo.caption" Class="muted-text">@mapping.SourceProduct -> @mapping.ProblemTitle</MudText>
+                                    <MudButton Variant="Variant.Outlined" Class="mt-3" OnClick="@(() => EditLessonMapping(mapping))">Edit</MudButton>
+                                    <MudButton Variant="Variant.Text" Color="Color.Error" Class="mt-3" OnClick="@(() => DeleteLessonMappingAsync(mapping.Id))">Delete</MudButton>
+                                </MudPaper>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Import / Export">
+                <MudGrid>
+                    <MudItem xs="12" md="5">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudText Typo="Typo.h6" Class="mb-4">Bulk Content Transfer</MudText>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ExportContentAsync" Class="mr-2">Export JSON</MudButton>
+                            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Disabled="@isSaving" OnClick="ImportContentAsync">Import JSON</MudButton>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="12" md="7">
+                        <MudPaper Class="surface-card pa-5">
+                            <MudTextField T="string" Label="AxiForge content JSON" Variant="Variant.Outlined" Lines="18" @bind-Value="importExportJson" />
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+        </MudTabs>
+    }
+</div>
+
+@code {
+    private List<AxiForgeAdminProblemModel> problems = new();
+    private List<AxiForgeAdminRoadmapModel> roadmaps = new();
+    private List<AxiForgeAdminAssessmentModel> assessments = new();
+    private List<AxiForgeLessonOptionModel> lessons = new();
+    private List<AxiForgeLessonPracticeMappingModel> lessonMappings = new();
+    private SaveAxiForgeProblemModel problemForm = NewProblemForm();
+    private SaveAxiForgeRoadmapModel roadmapForm = NewRoadmapForm();
+    private SaveAxiForgeAssessmentModel assessmentForm = NewAssessmentForm();
+    private SaveAxiForgeLessonPracticeMappingModel mappingForm = new();
+    private string importExportJson = string.Empty;
+    private bool isLoading = true;
+    private bool isSaving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Entering -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> OnInitializedAsync");
+        try
+        {
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> OnInitializedAsync -> {ex.Message}");
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> OnInitializedAsync");
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        Console.WriteLine("Entering -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> LoadAsync");
+        try
+        {
+            isLoading = true;
+            problems = await AdminService.GetAxiForgeProblemsAsync();
+            roadmaps = await AdminService.GetAxiForgeRoadmapsAsync();
+            assessments = await AdminService.GetAxiForgeAssessmentsAsync();
+            lessons = await AdminService.GetAxiForgeLessonsAsync();
+            lessonMappings = await AdminService.GetAxiForgeLessonMappingsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> LoadAsync -> {ex.Message}");
+            Snackbar.Add("Unable to load AxiForge content.", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+            Console.WriteLine("Exiting -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> LoadAsync");
+        }
+    }
+
+    private async Task SaveProblemAsync()
+    {
+        Console.WriteLine("Entering -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveProblemAsync");
+        try
+        {
+            isSaving = true;
+            var saved = await AdminService.SaveAxiForgeProblemAsync(problemForm);
+            Snackbar.Add(saved == null ? "Problem could not be saved." : "Problem saved.", saved == null ? Severity.Error : Severity.Success);
+            if (saved != null)
+            {
+                problemForm = NewProblemForm();
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveProblemAsync -> {ex.Message}");
+            Snackbar.Add("Problem save failed.", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            Console.WriteLine("Exiting -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveProblemAsync");
+        }
+    }
+
+    private async Task SaveRoadmapAsync()
+    {
+        Console.WriteLine("Entering -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveRoadmapAsync");
+        try
+        {
+            isSaving = true;
+            var saved = await AdminService.SaveAxiForgeRoadmapAsync(roadmapForm);
+            Snackbar.Add(saved == null ? "Roadmap could not be saved." : "Roadmap saved.", saved == null ? Severity.Error : Severity.Success);
+            if (saved != null)
+            {
+                roadmapForm = NewRoadmapForm();
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveRoadmapAsync -> {ex.Message}");
+            Snackbar.Add("Roadmap save failed.", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            Console.WriteLine("Exiting -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveRoadmapAsync");
+        }
+    }
+
+    private async Task SaveAssessmentAsync()
+    {
+        Console.WriteLine("Entering -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveAssessmentAsync");
+        try
+        {
+            isSaving = true;
+            var saved = await AdminService.SaveAxiForgeAssessmentAsync(assessmentForm);
+            Snackbar.Add(saved == null ? "Assessment could not be saved." : "Assessment saved.", saved == null ? Severity.Error : Severity.Success);
+            if (saved != null)
+            {
+                assessmentForm = NewAssessmentForm();
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveAssessmentAsync -> {ex.Message}");
+            Snackbar.Add("Assessment save failed.", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            Console.WriteLine("Exiting -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveAssessmentAsync");
+        }
+    }
+
+    private async Task SaveLessonMappingAsync()
+    {
+        Console.WriteLine("Entering -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveLessonMappingAsync");
+        try
+        {
+            isSaving = true;
+            var saved = await AdminService.SaveAxiForgeLessonMappingAsync(mappingForm);
+            Snackbar.Add(saved == null ? "Mapping could not be saved." : "Mapping saved.", saved == null ? Severity.Error : Severity.Success);
+            if (saved != null)
+            {
+                mappingForm = new SaveAxiForgeLessonPracticeMappingModel();
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveLessonMappingAsync -> {ex.Message}");
+            Snackbar.Add("Mapping save failed.", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            Console.WriteLine("Exiting -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> SaveLessonMappingAsync");
+        }
+    }
+
+    private async Task ArchiveProblemAsync(Guid id) => await RunMutationAsync(() => AdminService.ArchiveAxiForgeProblemAsync(id), "Problem archived.", "Problem archive failed.");
+    private async Task DeleteProblemAsync(Guid id) => await RunMutationAsync(() => AdminService.DeleteAxiForgeProblemAsync(id), "Problem deleted.", "Problem delete failed.");
+    private async Task ArchiveRoadmapAsync(Guid id) => await RunMutationAsync(() => AdminService.ArchiveAxiForgeRoadmapAsync(id), "Roadmap archived.", "Roadmap archive failed.");
+    private async Task DeleteRoadmapAsync(Guid id) => await RunMutationAsync(() => AdminService.DeleteAxiForgeRoadmapAsync(id), "Roadmap deleted.", "Roadmap delete failed.");
+    private async Task ArchiveAssessmentAsync(Guid id) => await RunMutationAsync(() => AdminService.ArchiveAxiForgeAssessmentAsync(id), "Assessment archived.", "Assessment archive failed.");
+    private async Task DeleteAssessmentAsync(Guid id) => await RunMutationAsync(() => AdminService.DeleteAxiForgeAssessmentAsync(id), "Assessment deleted.", "Assessment delete failed.");
+    private async Task DeleteLessonMappingAsync(Guid id) => await RunMutationAsync(() => AdminService.DeleteAxiForgeLessonMappingAsync(id), "Mapping deleted.", "Mapping delete failed.");
+
+    private async Task ExportContentAsync()
+    {
+        Console.WriteLine("Entering -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> ExportContentAsync");
+        try
+        {
+            var bundle = await AdminService.ExportAxiForgeContentAsync();
+            importExportJson = JsonSerializer.Serialize(bundle, new JsonSerializerOptions { WriteIndented = true });
+            Snackbar.Add("AxiForge JSON exported.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> ExportContentAsync -> {ex.Message}");
+            Snackbar.Add("Export failed.", Severity.Error);
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> ExportContentAsync");
+        }
+    }
+
+    private async Task ImportContentAsync()
+    {
+        Console.WriteLine("Entering -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> ImportContentAsync");
+        try
+        {
+            isSaving = true;
+            var bundle = JsonSerializer.Deserialize<AxiForgeAdminImportExportModel>(
+                importExportJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (bundle == null)
+            {
+                Snackbar.Add("Import JSON is not valid.", Severity.Error);
+                return;
+            }
+
+            var imported = await AdminService.ImportAxiForgeContentAsync(bundle);
+            Snackbar.Add(imported ? "AxiForge content imported." : "Import failed.", imported ? Severity.Success : Severity.Error);
+            if (imported)
+            {
+                await LoadAsync();
+            }
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"Exception -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> ImportContentAsync -> {ex.Message}");
+            Snackbar.Add("Import JSON is not valid.", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            Console.WriteLine("Exiting -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> ImportContentAsync");
+        }
+    }
+
+    private async Task RunMutationAsync(Func<Task<bool>> action, string successMessage, string errorMessage)
+    {
+        Console.WriteLine("Entering -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> RunMutationAsync");
+        try
+        {
+            isSaving = true;
+            var completed = await action();
+            Snackbar.Add(completed ? successMessage : errorMessage, completed ? Severity.Success : Severity.Error);
+            if (completed)
+            {
+                await LoadAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> RunMutationAsync -> {ex.Message}");
+            Snackbar.Add(errorMessage, Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+            Console.WriteLine("Exiting -> AxiPlus.Web -> Components/Pages -> AxiForgeAdmin.razor -> RunMutationAsync");
+        }
+    }
+
+    private void AddProblemTestCase() => problemForm.TestCases.Add(new SaveAxiForgeTestCaseModel { Order = problemForm.TestCases.Count + 1 });
+    private void AddRoadmapStep() => roadmapForm.Steps.Add(new SaveAxiForgeRoadmapStepModel { Order = roadmapForm.Steps.Count + 1 });
+    private void AddAssessmentQuestion() => assessmentForm.Questions.Add(new SaveAxiForgeQuestionModel { Order = assessmentForm.Questions.Count + 1 });
+
+    private void EditProblem(AxiForgeAdminProblemModel problem)
+    {
+        problemForm = new SaveAxiForgeProblemModel
+        {
+            Id = problem.Id,
+            Slug = problem.Slug,
+            Title = problem.Title,
+            Description = problem.Description,
+            InputFormat = problem.InputFormat,
+            OutputFormat = problem.OutputFormat,
+            Constraints = problem.Constraints,
+            Examples = problem.Examples,
+            Explanation = problem.Explanation,
+            Difficulty = problem.Difficulty,
+            Topic = problem.Topic,
+            Tags = problem.Tags,
+            StarterCode = problem.StarterCode,
+            StarterCodeByLanguage = problem.StarterCodeByLanguage,
+            ExpectedOutput = problem.ExpectedOutput,
+            TimeLimitMilliseconds = problem.TimeLimitMilliseconds,
+            MemoryLimitKb = problem.MemoryLimitKb,
+            IsPublished = problem.IsPublished,
+            TestCases = problem.TestCases.Select(x => new SaveAxiForgeTestCaseModel
+            {
+                Input = x.Input,
+                ExpectedOutput = x.ExpectedOutput,
+                IsHidden = x.IsHidden,
+                Order = x.Order
+            }).ToList()
+        };
+    }
+
+    private void EditRoadmap(AxiForgeAdminRoadmapModel roadmap)
+    {
+        roadmapForm = new SaveAxiForgeRoadmapModel
+        {
+            Id = roadmap.Id,
+            Slug = roadmap.Slug,
+            Title = roadmap.Title,
+            Description = roadmap.Description,
+            Level = roadmap.Level,
+            IsPublished = roadmap.IsPublished,
+            Steps = roadmap.Steps.Select(x => new SaveAxiForgeRoadmapStepModel
+            {
+                Title = x.Title,
+                Description = x.Description,
+                Order = x.Order
+            }).ToList()
+        };
+    }
+
+    private void EditAssessment(AxiForgeAdminAssessmentModel assessment)
+    {
+        assessmentForm = new SaveAxiForgeAssessmentModel
+        {
+            Id = assessment.Id,
+            Slug = assessment.Slug,
+            Title = assessment.Title,
+            Description = assessment.Description,
+            DurationMinutes = assessment.DurationMinutes,
+            PassingScore = assessment.PassingScore,
+            IsPublished = assessment.IsPublished,
+            Questions = assessment.Questions.Select(x => new SaveAxiForgeQuestionModel
+            {
+                Prompt = x.Prompt,
+                OptionA = x.OptionA,
+                OptionB = x.OptionB,
+                OptionC = x.OptionC,
+                OptionD = x.OptionD,
+                CorrectOption = x.CorrectOption,
+                Order = x.Order
+            }).ToList()
+        };
+    }
+
+    private void EditLessonMapping(AxiForgeLessonPracticeMappingModel mapping)
+    {
+        mappingForm = new SaveAxiForgeLessonPracticeMappingModel
+        {
+            SourceLessonId = mapping.SourceLessonId,
+            ProblemId = mapping.ProblemId,
+            SourceProduct = mapping.SourceProduct
+        };
+    }
+
+    private static SaveAxiForgeProblemModel NewProblemForm() => new()
+    {
+        Difficulty = "Easy",
+        TimeLimitMilliseconds = 1000,
+        MemoryLimitKb = 262144,
+        StarterCodeByLanguage = "{\n  \"csharp\": \"public class Solution {\\n    public string Solve(string input) {\\n        return string.Empty;\\n    }\\n}\",\n  \"javascript\": \"function solve(input) {\\n  return '';\\n}\",\n  \"python\": \"def solve(input):\\n    return ''\"\n}",
+        TestCases = new List<SaveAxiForgeTestCaseModel>
+        {
+            new() { Order = 1 }
+        }
+    };
+
+    private static SaveAxiForgeRoadmapModel NewRoadmapForm() => new()
+    {
+        Steps = new List<SaveAxiForgeRoadmapStepModel>
+        {
+            new() { Order = 1 }
+        }
+    };
+
+    private static SaveAxiForgeAssessmentModel NewAssessmentForm() => new()
+    {
+        Questions = new List<SaveAxiForgeQuestionModel>
+        {
+            new() { Order = 1 }
+        }
+    };
+}

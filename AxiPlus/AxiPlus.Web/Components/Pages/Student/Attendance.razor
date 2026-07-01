@@ -1,0 +1,303 @@
+@page "/student/attendance"
+
+@using AxiPlus.Domain.Enums
+@using AxiPlus.Web.Models.Attendance
+@using AxiPlus.Web.Models.Operations
+@using AxiPlus.Web.Services
+
+@inject AttendanceApiService AttendanceService
+@inject OperationsApiService OperationsService
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h4" Class="mb-6">Attendance</MudText>
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (summary == null)
+{
+    <MudAlert Severity="Severity.Warning">
+        Attendance data is not available for your profile.
+    </MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.caption">Overall Attendance</MudText>
+                <MudText Typo="Typo.h3">
+                    @summary.AttendancePercentage%
+                </MudText>
+                <MudProgressLinear Value="@((double)summary.AttendancePercentage)"
+                                   Color="@GetAttendanceColor(summary.AttendancePercentage)"
+                                   Class="mt-3" />
+
+                <MudDivider Class="my-4" />
+
+                <MudStack Spacing="2">
+                    <MudText>Total classes: @summary.TotalClasses</MudText>
+                    <MudText>Present: @summary.PresentCount</MudText>
+                    <MudText>Late: @summary.LateCount</MudText>
+                    <MudText>Absent: @summary.AbsentCount</MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.h6">Recent Classes</MudText>
+                <MudDivider Class="my-3" />
+
+                @if (summary.RecentClasses.Count == 0)
+               {
+                    <MudText Color="Color.Secondary">
+                        Attendance records will appear after live classes are marked.
+                    </MudText>
+                }
+                else
+               {
+                    <MudStack Spacing="2">
+                        @foreach (var record in summary.RecentClasses)
+                       {
+                            <MudPaper Class="pa-3"
+                                      Elevation="0"
+                                      Outlined="true">
+                                <MudStack Row="true"
+                                          Justify="Justify.SpaceBetween"
+                                          AlignItems="AlignItems.Center">
+                                    <div>
+                                        <MudText Typo="Typo.subtitle1">
+                                            @record.Title
+                                        </MudText>
+                                        <MudText Typo="Typo.body2"
+                                                 Color="Color.Secondary">
+                                            @record.StartTime.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                        </MudText>
+                                    </div>
+
+                                    <MudChip T="string"
+                                             Color="@GetStatusColor(record.Status)">
+                                        @record.Status
+                                    </MudChip>
+                                </MudStack>
+
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Warning"
+                                           Class="mt-3"
+                                           Disabled="@(record.SessionId == Guid.Empty)"
+                                           OnClick="@(() => SelectDiscrepancySession(record))">
+                                    Report Issue
+                                </MudButton>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.h6">Attendance Issue</MudText>
+                <MudDivider Class="my-3" />
+
+                @if (selectedSessionId == Guid.Empty)
+               {
+                    <MudAlert Severity="Severity.Info">
+                        Select a class above to report an attendance discrepancy.
+                    </MudAlert>
+                }
+                else
+               {
+                    <MudAlert Severity="Severity.Info" Class="mb-3">
+                        Reporting issue for @selectedSessionTitle.
+                    </MudAlert>
+
+                    <MudSelect T="AttendanceStatus"
+                               Label="Requested status"
+                               Variant="Variant.Outlined"
+                               @bind-Value="requestedStatus"
+                               Class="mb-3">
+                        <MudSelectItem T="AttendanceStatus" Value="@AttendanceStatus.Present">
+                            Present
+                        </MudSelectItem>
+                        <MudSelectItem T="AttendanceStatus" Value="@AttendanceStatus.Late">
+                            Late
+                        </MudSelectItem>
+                        <MudSelectItem T="AttendanceStatus" Value="@AttendanceStatus.Absent">
+                            Absent
+                        </MudSelectItem>
+                    </MudSelect>
+
+                    <MudTextField T="string"
+                                  Label="Reason"
+                                  Variant="Variant.Outlined"
+                                  Immediate="true"
+                                  Lines="4"
+                                  @bind-Value="discrepancyReason"
+                                  Class="mb-4" />
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Disabled="@isSaving"
+                               OnClick="SubmitDiscrepancyAsync">
+                        Submit Issue
+                    </MudButton>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12">
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.h6">Reported Issues</MudText>
+                <MudDivider Class="my-3" />
+
+                <MudStack Spacing="2">
+                    @foreach (var issue in discrepancies)
+                   {
+                        <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+                            <MudStack Row="true"
+                                      Justify="Justify.SpaceBetween"
+                                      AlignItems="AlignItems.Center">
+                                <div>
+                                    <MudText Typo="Typo.subtitle2">@issue.SessionTitle</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        @issue.CurrentStatus -> @issue.RequestedStatus
+                                    </MudText>
+                                </div>
+
+                                <MudChip T="string" Color="@GetDiscrepancyColor(issue.Status)">
+                                    @issue.Status
+                                </MudChip>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code{
+    private StudentAttendanceSummaryModel? summary;
+    private readonly List<AttendanceDiscrepancyModel> discrepancies = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private Guid selectedSessionId = Guid.Empty;
+    private string selectedSessionTitle = string.Empty;
+    private AttendanceStatus requestedStatus = AttendanceStatus.Present;
+    private string discrepancyReason = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        await LoadAsync();
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadAsync()
+   {
+        summary = await AttendanceService.GetMineAsync();
+        discrepancies.Clear();
+        discrepancies.AddRange(
+            await OperationsService.GetStudentAttendanceDiscrepanciesAsync());
+    }
+
+    private void SelectDiscrepancySession(AttendanceRecordModel record)
+   {
+        if (record.SessionId == Guid.Empty)
+       {
+            Snackbar.Add("This class cannot be reported because its session is missing.", Severity.Error);
+            return;
+        }
+
+        selectedSessionId = record.SessionId;
+        selectedSessionTitle = record.Title;
+        requestedStatus = record.Status switch
+       {
+            "Present" => AttendanceStatus.Present,
+            "Late" => AttendanceStatus.Late,
+            "Absent" => AttendanceStatus.Absent,
+            _ => AttendanceStatus.Present
+        };
+
+        Snackbar.Add("Class selected. Add the reason and submit the issue.", Severity.Info);
+    }
+
+    private async Task SubmitDiscrepancyAsync()
+   {
+        if (selectedSessionId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(discrepancyReason))
+       {
+            Snackbar.Add("Select a class and enter a reason.", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        var created = await OperationsService.CreateAttendanceDiscrepancyAsync(
+            new CreateAttendanceDiscrepancyModel
+           {
+                SessionId = selectedSessionId,
+                RequestedStatus = requestedStatus,
+                Reason = discrepancyReason
+            });
+
+        isSaving = false;
+
+        if (created == null)
+       {
+            Snackbar.Add("Attendance issue could not be submitted.", Severity.Error);
+            return;
+        }
+
+        selectedSessionId = Guid.Empty;
+        selectedSessionTitle = string.Empty;
+        discrepancyReason = string.Empty;
+        await LoadAsync();
+        Snackbar.Add("Attendance issue submitted.", Severity.Success);
+    }
+
+    private static Color GetAttendanceColor(decimal percentage)
+   {
+        if (percentage >= 85)
+       {
+            return Color.Success;
+        }
+
+        if (percentage >= 70)
+       {
+            return Color.Warning;
+        }
+
+        return Color.Error;
+    }
+
+    private static Color GetStatusColor(string status)
+   {
+        return status switch
+       {
+            "Present" => Color.Success,
+            "Late" => Color.Warning,
+            "Absent" => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetDiscrepancyColor(AttendanceDiscrepancyStatus status)
+   {
+        return status switch
+       {
+            AttendanceDiscrepancyStatus.Approved => Color.Success,
+            AttendanceDiscrepancyStatus.Rejected => Color.Error,
+            AttendanceDiscrepancyStatus.InReview => Color.Info,
+            _ => Color.Warning
+        };
+    }
+}

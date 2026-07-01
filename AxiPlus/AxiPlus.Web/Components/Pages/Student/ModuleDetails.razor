@@ -1,0 +1,104 @@
+@page "/student/modules/{ModuleId:int}"
+
+@using AxiPlus.Domain.Enums
+@using AxiPlus.Web.Models.Modules
+@using AxiPlus.Web.Services
+
+@inject ModuleApiService ModuleService
+@inject NavigationManager Navigation
+
+<div class="page-shell">
+    @if (module == null)
+   {
+        <div class="loading-state">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else
+   {
+        <div class="page-header">
+            <div>
+                <MudText Typo="Typo.h4">@module.Title</MudText>
+                <MudText Typo="Typo.body2">@module.Description</MudText>
+            </div>
+
+            <MudChip T="string" Color="Color.Primary">
+                @lessons.Count lessons
+            </MudChip>
+        </div>
+
+        <MudPaper Class="surface-card pa-5">
+            <MudText Typo="Typo.h6" Class="mb-4">Lessons</MudText>
+
+            <MudStack Spacing="2">
+                @foreach (var lesson in lessons)
+               {
+                    <MudPaper Class="list-card pa-4">
+                        <MudStack Row="true"
+                                  Justify="Justify.SpaceBetween"
+                                  AlignItems="AlignItems.Center">
+                            <div>
+                                <MudText Typo="Typo.subtitle1">@lesson.Title</MudText>
+                                <MudText Typo="Typo.body2" Class="muted-text">
+                                    @lesson.Description
+                                </MudText>
+                            </div>
+
+                            <div class="action-row">
+                                <MudChip T="string"
+                                         Color="@GetStatusColor(lesson.Status)">
+                                    @lesson.Status
+                                </MudChip>
+
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           Href="@($"/student/lesson/{lesson.LessonId}")">
+                                    Open
+                                </MudButton>
+                            </div>
+                        </MudStack>
+                    </MudPaper>
+                }
+            </MudStack>
+        </MudPaper>
+    }
+</div>
+
+@code{
+    [Parameter]
+    public int ModuleId{get;set; }
+
+    private ModuleDetailsModel? module;
+    private List<LessonProgressModel> lessons = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        module = await ModuleService.GetModuleDetailsAsync(ModuleId);
+
+        if (module == null || module.ModuleId == 0)
+       {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        lessons = module.Lessons;
+
+        StateHasChanged();
+    }
+
+    private static Color GetStatusColor(LessonStatus status)
+   {
+        return status switch
+       {
+            LessonStatus.Completed => Color.Success,
+            LessonStatus.Pending => Color.Default,
+            LessonStatus.NeedsRevision => Color.Error,
+            _ => Color.Warning
+        };
+    }
+}

@@ -1,0 +1,123 @@
+@page "/student/practice"
+
+@using AxiPlus.Web.Models.StudentPortal
+@using AxiPlus.Web.Services
+
+@inject StudentPortalApiService StudentPortalService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h4" Class="mb-6">Practice Code</MudText>
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.h6">Practice Links</MudText>
+                <MudDivider Class="my-3" />
+
+                @if (practiceItems.Count == 0)
+               {
+                    <MudText Color="Color.Secondary">
+                        Practice links will appear as lessons are unlocked.
+                    </MudText>
+                }
+                else
+               {
+                    <MudStack Spacing="2">
+                        @foreach (var item in practiceItems)
+                       {
+                            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                                <MudStack Row="true"
+                                          Justify="Justify.SpaceBetween"
+                                          AlignItems="AlignItems.Center">
+                                    <div>
+                                        <MudText Typo="Typo.subtitle1">
+                                            @item.LessonTitle
+                                        </MudText>
+                                        <MudText Typo="Typo.body2"
+                                                 Color="Color.Secondary">
+                                            @item.ModuleTitle
+                                        </MudText>
+                                        <MudText Typo="Typo.caption">
+                                            Status: @item.Status
+                                        </MudText>
+                                    </div>
+
+                                    <MudStack Row="true"
+                                              AlignItems="AlignItems.Center"
+                                              Spacing="2">
+                                        <MudChip T="string"
+                                                 Color="@(item.IsCompleted ? Color.Success : Color.Info)">
+                                            @(item.IsCompleted ? "Completed" : "Practice")
+                                        </MudChip>
+
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Disabled="@launchingLessonId.Equals(item.LessonId)"
+                                                   OnClick="() => LaunchPracticeAsync(item.LessonId)">
+                                            Open
+                                        </MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.h6">Progress Tip</MudText>
+                <MudDivider Class="my-3" />
+                <MudText>
+                    Complete practice tasks from each lesson before marking the lesson complete.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code{
+    private readonly List<StudentPracticeItemModel> practiceItems = new();
+    private bool isLoading = true;
+    private Guid launchingLessonId;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        practiceItems.AddRange(await StudentPortalService.GetPracticeAsync());
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task LaunchPracticeAsync(Guid lessonId)
+   {
+        launchingLessonId = lessonId;
+        try
+       {
+            var redirectUrl = await StudentPortalService.CreatePracticeLaunchUrlAsync(lessonId);
+            if (string.IsNullOrWhiteSpace(redirectUrl))
+           {
+                Snackbar.Add("Practice could not be opened. Please check your plan access and try again.", Severity.Error);
+                return;
+            }
+
+            Navigation.NavigateTo(redirectUrl, forceLoad: true);
+        }
+        finally
+       {
+            launchingLessonId = Guid.Empty;
+        }
+    }
+}

@@ -1,0 +1,13 @@
+@page "/assistant/dashboard"
+@using System.Reflection
+
+@inject NavigationManager Navigation
+
+<PageTitle>Assistant Dashboard</PageTitle>
+
+@code{        
+    protected override void OnInitialized()
+   {
+        Navigation.NavigateTo("/mentor/dashboard", true);
+    }
+}

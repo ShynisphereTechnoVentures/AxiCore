@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AxiForge.Domain\AxiForge.Domain.csproj" />
+    <ProjectReference Include="..\..\AxiCore.Shared\AxiCore.Contracts\AxiCore.Contracts.csproj" />
+    <ProjectReference Include="..\..\AxiCore.Shared\AxiCore.SharedKernel\AxiCore.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

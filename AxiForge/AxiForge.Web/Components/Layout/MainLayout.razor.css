@@ -1,0 +1,148 @@
+.forge-app-frame {
+    min-height: 100vh;
+}
+
+.forge-top-nav {
+    align-items: center;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 200px minmax(320px, 1fr) auto;
+    height: 54px;
+    padding: 0 22px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.forge-brand,
+.forge-main-tabs,
+.forge-top-actions {
+    align-items: center;
+    display: flex;
+}
+
+.forge-brand {
+    gap: 8px;
+    font-weight: 800;
+}
+
+.forge-brand a,
+.forge-main-tabs a {
+    color: #111827;
+    text-decoration: none;
+}
+
+.brand-mark {
+    align-items: center;
+    border: 2px solid #f59e0b;
+    border-radius: 7px;
+    display: inline-flex;
+    font-size: 14px;
+    height: 24px;
+    justify-content: center;
+    width: 24px;
+}
+
+.forge-main-tabs {
+    gap: 26px;
+    height: 100%;
+}
+
+.forge-main-tabs a {
+    align-items: center;
+    display: inline-flex;
+    font-weight: 600;
+    height: 100%;
+}
+
+.forge-main-tabs a:hover {
+    border-bottom: 2px solid #111827;
+}
+
+.forge-top-actions {
+    gap: 12px;
+}
+
+.forge-top-actions input {
+    background: #f3f4f6;
+    border: 0;
+    border-radius: 999px;
+    height: 34px;
+    padding: 0 14px;
+    width: 150px;
+}
+
+.premium-pill {
+    background: #fff3df;
+    border-radius: 8px;
+    color: #ea580c;
+    font-weight: 700;
+    padding: 8px 12px;
+    text-decoration: none;
+}
+
+.top-user {
+    color: #4b5563;
+    font-size: 14px;
+    font-weight: 700;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.top-logout {
+    background: #f3f4f6;
+    border: 0;
+    border-radius: 8px;
+    color: #111827;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 8px 12px;
+}
+
+.forge-body {
+    min-height: calc(100vh - 54px);
+}
+
+.forge-main {
+    background: #ffffff;
+    min-width: 0;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    color-scheme: light only;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+@media (max-width: 900px) {
+    .forge-top-nav {
+        grid-template-columns: 1fr;
+        height: auto;
+        padding: 12px 16px;
+    }
+
+    .forge-main-tabs,
+    .forge-top-actions {
+        flex-wrap: wrap;
+    }
+
+}

@@ -1,0 +1,67 @@
+@inherits LayoutComponentBase
+@inject AxiForge.Web.Services.AuthStateService AuthState
+@inject NavigationManager Navigation
+
+<div class="forge-app-frame">
+    <header class="forge-top-nav">
+        <div class="forge-brand">
+            <span class="brand-mark">A</span>
+            <a href="/">AxiForge</a>
+        </div>
+        <nav class="forge-main-tabs">
+            <a href="/practice">Problems</a>
+            <a href="/roadmaps">Explore</a>
+            <a href="/assessments">Assessments</a>
+            <a href="/dashboard">Dashboard</a>
+        </nav>
+        <div class="forge-top-actions">
+            <input type="search" placeholder="Search" />
+            @if (AuthState.IsAuthenticated)
+            {
+                <span class="top-user">@AuthState.CurrentUser?.FullName</span>
+                <button class="top-logout" @onclick="Logout">Logout</button>
+            }
+            else
+            {
+                <a class="premium-pill" href="/login">Student Access</a>
+            }
+        </div>
+    </header>
+
+    <div class="forge-body">
+        <main class="forge-main">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// Clears the AxiForge session from the top navigation.
+    /// Returns no value because the layout owns only local navigation state.
+    /// </summary>
+    private void Logout()
+    {
+        Console.WriteLine("Entering -> MainLayout.razor -> Logout");
+        try
+        {
+            AuthState.Clear();
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> MainLayout.razor -> Logout -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> MainLayout.razor -> Logout");
+        }
+    }
+}
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">x</span>
+</div>

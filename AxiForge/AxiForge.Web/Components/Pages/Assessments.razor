@@ -1,0 +1,40 @@
+@page "/assessments"
+@inject AxiForge.Web.Services.AxiForgeApiClient ApiClient
+
+<PageTitle>AxiForge Assessments</PageTitle>
+
+<section class="forge-panel">
+    <p class="eyebrow">Assessments</p>
+    <h1>Readiness Checks</h1>
+
+    <div class="problem-list">
+        @foreach (var assessment in assessments)
+        {
+            <a href="@($"/assessments/{assessment.Id}")">
+                <strong>@assessment.Title</strong>
+                <span>@assessment.DurationMinutes min · @assessment.QuestionCount questions</span>
+            </a>
+        }
+    </div>
+</section>
+
+@code {
+    private List<AxiForge.Application.DTOs.Assessments.AssessmentTemplateDto> assessments = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Entering -> Assessments.razor -> OnInitializedAsync");
+        try
+        {
+            assessments = await ApiClient.GetAssessmentsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> Assessments.razor -> OnInitializedAsync -> {ex.Message}");
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> Assessments.razor -> OnInitializedAsync");
+        }
+    }
+}

@@ -1,0 +1,84 @@
+@page "/practice/launch"
+@inject AxiForge.Web.Services.AxiForgeApiClient ApiClient
+@inject AxiForge.Web.Services.AuthStateService AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>AxiForge Practice Launch</PageTitle>
+
+<section class="auth-page">
+    <div class="auth-card">
+        <p class="eyebrow">AxiPlus Practice</p>
+        <h1>Opening coding practice</h1>
+        <p class="lead">@message</p>
+    </div>
+</section>
+
+@code {
+    private string message = "Validating your lesson practice link...";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Entering -> PracticeLaunch.razor -> OnInitializedAsync");
+        try
+        {
+            var token = GetToken();
+            var launch = await ApiClient.ValidateLaunchAsync(token);
+
+            if (launch == null || !launch.IsValid)
+            {
+                message = "This practice link is invalid or expired. Please open practice again from AxiPlus.";
+                return;
+            }
+
+            var practiceRoute = $"/practice?source={Uri.EscapeDataString(launch.SourceProduct)}&lessonId={Uri.EscapeDataString(launch.LessonId)}";
+            if (!AuthState.IsAuthenticated)
+            {
+                var auth = await ApiClient.LaunchLoginAsync(token);
+                if (auth != null)
+                {
+                    AuthState.SetUser(auth);
+                    Navigation.NavigateTo(practiceRoute);
+                    return;
+                }
+
+                Navigation.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(practiceRoute)}");
+                return;
+            }
+
+            Navigation.NavigateTo(practiceRoute);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> PracticeLaunch.razor -> OnInitializedAsync -> {ex.Message}");
+            message = "Unable to open this practice link.";
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> PracticeLaunch.razor -> OnInitializedAsync");
+        }
+    }
+
+    /// <summary>
+    /// Reads the launch token from the current query string.
+    /// Returns the token value so it can be validated by the AxiForge API.
+    /// </summary>
+    private string GetToken()
+    {
+        Console.WriteLine("Entering -> PracticeLaunch.razor -> GetToken");
+        try
+        {
+            var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+            return query.TryGetValue("token", out var token) ? token.ToString() : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> PracticeLaunch.razor -> GetToken -> {ex.Message}");
+            return string.Empty;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> PracticeLaunch.razor -> GetToken");
+        }
+    }
+}

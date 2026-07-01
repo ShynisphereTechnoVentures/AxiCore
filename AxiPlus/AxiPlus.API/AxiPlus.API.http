@@ -1,0 +1,6 @@
+@AxiPlus.API_HostAddress = http://localhost:5228
+
+GET AxiPlus.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

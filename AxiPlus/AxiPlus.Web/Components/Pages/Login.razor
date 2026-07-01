@@ -1,0 +1,123 @@
+@rendermode InteractiveServer
+@layout AxiPlus.Web.Components.Layout.AuthLayout
+
+@page "/login"
+
+@using AxiPlus.Web.Models
+@using AxiPlus.Web.Services
+
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Login</PageTitle>
+
+<div class="auth-card">
+    <div class="auth-card-title">
+        <MudText Typo="Typo.h4">Sign in</MudText>
+        <MudText Typo="Typo.body2" Class="muted-text">
+            AxiPlus account access
+        </MudText>
+    </div>
+
+    <form @onsubmit="HandleLogin" @onsubmit:preventDefault="true">
+        <div class="form-field mb-3">
+            <label for="login-email">Email</label>
+            <input id="login-email"
+                   class="form-control"
+                   autocomplete="username"
+                   @bind="loginRequest.Email"
+                   @bind:event="oninput" />
+        </div>
+
+        <div class="form-field mb-4">
+            <label for="login-password">Password</label>
+            <input id="login-password"
+                   class="form-control"
+                   type="password"
+                   autocomplete="current-password"
+                   @bind="loginRequest.Password"
+                   @bind:event="oninput" />
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+       {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-4">
+                @errorMessage
+            </MudAlert>
+        }
+
+        <button type="button"
+                id="login-button"
+                class="btn btn-primary w-100"
+                disabled="@isSubmitting"
+                @onclick="HandleLogin">
+            Login
+        </button>
+    </form>
+
+    <MudStack Row="true"
+              Justify="Justify.Center"
+              Spacing="3"
+              Class="mt-4">
+        <MudLink Href="/forgot-password">Forgot password?</MudLink>
+        <MudLink Href="/register">Register</MudLink>
+    </MudStack>
+</div>
+
+@code{      
+    private LoginRequestDto loginRequest = new();
+    private string errorMessage = string.Empty;
+    private bool isSubmitting;
+
+    private async Task HandleLogin()
+   {
+        errorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(loginRequest.Email) ||
+            string.IsNullOrWhiteSpace(loginRequest.Password))
+       {
+            errorMessage = "Email and password are required.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        var result = await AuthService.LoginAsync(
+            loginRequest.Email,
+            loginRequest.Password);
+
+        isSubmitting = false;
+
+        if (result != null)
+       {
+            var role = await AuthService.GetRoleAsync();
+            role ??= result.Role;
+
+            switch (role)
+           {      
+                case "SuperAdmin":
+                    Navigation.NavigateTo("/admin/dashboard");
+                    break;
+                case "Admin":
+                    Navigation.NavigateTo("/admin/dashboard");
+                    break;
+                case "MainMentor":
+                    Navigation.NavigateTo("/mentor/dashboard");
+                    break;
+                case "AssistantMentor":
+                    Navigation.NavigateTo("/mentor/dashboard");
+                    break;
+                case "Student":
+                    Navigation.NavigateTo("/student/dashboard");
+                    break;
+                default:
+                    Navigation.NavigateTo("/");
+                    break;
+            }
+        }
+        else
+       {
+            errorMessage = "Login failed. Check that the API is running and the email/password are correct.";
+        }
+    }
+}

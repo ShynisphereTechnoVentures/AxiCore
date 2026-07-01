@@ -1,0 +1,255 @@
+@page "/student/assignments"
+
+@using AxiPlus.Web.Models.Assignments
+@using AxiPlus.Web.Services
+
+@inject AssignmentApiService AssignmentService
+
+<MudText Typo="Typo.h4" Class="mb-6">Assignments</MudText>
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-5 mb-4">
+                <MudStack Row="true"
+                          Justify="Justify.SpaceBetween"
+                          AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h6">Pending Work</MudText>
+                    <MudChip T="string" Color="Color.Warning">
+                        @PendingCount pending
+                    </MudChip>
+                </MudStack>
+
+                <MudDivider Class="my-3" />
+
+                @if (assignments.Count == 0)
+               {
+                    <MudAlert Severity="Severity.Info">
+                        No assignments are published for your batch yet.
+                    </MudAlert>
+                }
+                else
+               {
+                    <MudStack Spacing="3">
+                        @foreach (var assignment in assignments)
+                       {
+                            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                                <MudStack Row="true"
+                                          Justify="Justify.SpaceBetween"
+                                          AlignItems="AlignItems.Start">
+                                    <div>
+                                        <MudText Typo="Typo.h6">
+                                            @assignment.Title
+                                        </MudText>
+
+                                        <MudText Typo="Typo.body2"
+                                                 Color="Color.Secondary">
+                                            @assignment.ModuleTitle
+                                        </MudText>
+                                    </div>
+
+                                    <MudChip T="string"
+                                             Color="@GetStatusColor(assignment)">
+                                        @assignment.Status
+                                    </MudChip>
+                                </MudStack>
+
+                                <MudText Class="mt-3">
+                                    @assignment.Description
+                                </MudText>
+
+                                <MudStack Row="true"
+                                          AlignItems="AlignItems.Center"
+                                          Spacing="2"
+                                          Class="mt-3">
+                                    <MudIcon Icon="@Icons.Material.Filled.Event" />
+                                    <MudText Typo="Typo.body2">
+                                        Due @assignment.DueAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                    </MudText>
+                                </MudStack>
+
+                                @if (!string.IsNullOrWhiteSpace(assignment.SubmissionLink))
+                               {
+                                    <MudAlert Severity="Severity.Success"
+                                              Dense="true"
+                                              Class="mt-3">
+                                        Submitted: @assignment.SubmissionLink
+                                    </MudAlert>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(assignment.Feedback))
+                               {
+                                    <MudAlert Severity="Severity.Info"
+                                              Dense="true"
+                                              Class="mt-3">
+                                        Mentor feedback: @assignment.Feedback
+                                    </MudAlert>
+                                }
+
+                                <MudButton Variant="Variant.Filled"
+                                           Color="Color.Primary"
+                                           Class="mt-4"
+                                           OnClick="@(() => SelectAssignment(assignment))">
+                                    @(assignment.Status == "Pending" ? "Submit Work" : "Update Submission")
+                                </MudButton>
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.h6">Submission</MudText>
+                <MudDivider Class="my-3" />
+
+                @if (selectedAssignment == null)
+               {
+                    <MudText Color="Color.Secondary">
+                        Select an assignment to submit a GitHub link, live URL, or project link.
+                    </MudText>
+                }
+                else
+               {
+                    <MudText Typo="Typo.subtitle1">
+                        @selectedAssignment.Title
+                    </MudText>
+
+                    <MudTextField T="string"
+                                  Label="Submission link"
+                                  Variant="Variant.Outlined"
+                                  Immediate="true"
+                                  @bind-Value="submissionLink"
+                                  Class="mt-4 mb-3" />
+
+                    <MudTextField T="string"
+                                  Label="Notes for mentor"
+                                  Variant="Variant.Outlined"
+                                  Immediate="true"
+                                  Lines="4"
+                                  @bind-Value="submissionNotes"
+                                  Class="mb-4" />
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               Disabled="@isSubmitting"
+                               OnClick="SubmitSelectedAsync">
+                        Save Submission
+                    </MudButton>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(statusMessage))
+               {
+                    <MudAlert Severity="@statusSeverity"
+                              Dense="true"
+                              Class="mt-4">
+                        @statusMessage
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code{
+    private readonly List<StudentAssignmentModel> assignments = new();
+    private StudentAssignmentModel? selectedAssignment;
+    private string submissionLink = string.Empty;
+    private string submissionNotes = string.Empty;
+    private string statusMessage = string.Empty;
+    private Severity statusSeverity = Severity.Info;
+    private bool isLoading = true;
+    private bool isSubmitting;
+
+    private int PendingCount => assignments.Count(x =>
+        x.Status == "Pending" || x.Status == "RevisionRequested");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        await LoadAssignmentsAsync();
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadAssignmentsAsync()
+   {
+        assignments.Clear();
+        assignments.AddRange(await AssignmentService.GetMineAsync());
+    }
+
+    private void SelectAssignment(StudentAssignmentModel assignment)
+   {
+        selectedAssignment = assignment;
+        submissionLink = assignment.SubmissionLink;
+        submissionNotes = string.Empty;
+        statusMessage = string.Empty;
+    }
+
+    private async Task SubmitSelectedAsync()
+   {
+        if (selectedAssignment == null)
+       {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(submissionLink))
+       {
+            statusSeverity = Severity.Warning;
+            statusMessage = "Add a GitHub link, live URL, or project link before submitting.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        var result = await AssignmentService.SubmitAsync(
+            selectedAssignment.AssignmentId,
+            new SubmitAssignmentModel
+           {
+                SubmissionLink = submissionLink,
+                Notes = submissionNotes
+            });
+
+        if (result == null)
+       {
+            statusSeverity = Severity.Error;
+            statusMessage = "Submission failed. Please try again.";
+        }
+        else
+       {
+            await LoadAssignmentsAsync();
+            selectedAssignment = assignments.FirstOrDefault(x =>
+                x.AssignmentId == result.AssignmentId);
+            statusSeverity = Severity.Success;
+            statusMessage = "Submission saved.";
+        }
+
+        isSubmitting = false;
+    }
+
+    private static Color GetStatusColor(StudentAssignmentModel assignment)
+   {
+        if (assignment.IsOverdue)
+       {
+            return Color.Error;
+        }
+
+        return assignment.Status switch
+       {
+            "Submitted" => Color.Info,
+            "Reviewed" => Color.Success,
+            "RevisionRequested" => Color.Warning,
+            _ => Color.Default
+        };
+    }
+}

@@ -1,0 +1,339 @@
+@page "/"
+@page "/login"
+@using AxiForge.Application.DTOs.Auth
+@inject AxiForge.Web.Services.AxiForgeApiClient ApiClient
+@inject AxiForge.Web.Services.AuthStateService AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>AxiForge Access</PageTitle>
+
+<section class="auth-page forge-auth-page">
+    <div class="auth-visual forge-auth-visual">
+        <a class="auth-home-link" href="/">AxiForge</a>
+        <div class="auth-logo-row">
+            <span class="brand-mark auth-brand-mark">A</span>
+            <strong>AxiCore Practice Passport</strong>
+        </div>
+        <h1>Enter the Forge. Build your coding strength.</h1>
+        <p>Continue from AxiPlus lessons, start focused coding practice, and keep every attempt connected to your student passport.</p>
+        <div class="auth-metrics">
+            <span><strong>DB</strong> problems</span>
+            <span><strong>Live</strong> test cases</span>
+            <span><strong>Core</strong> access</span>
+        </div>
+    </div>
+
+    <div class="auth-card forge-auth-card">
+        <div class="auth-tabs" role="tablist" aria-label="AxiForge access modes">
+            <button type="button" class="@GetModeClass(AuthMode.Login)" @onclick="() => SetMode(AuthMode.Login)">Login</button>
+            <button type="button" class="@GetModeClass(AuthMode.Register)" @onclick="() => SetMode(AuthMode.Register)">Forge Account</button>
+            <button type="button" class="@GetModeClass(AuthMode.Reset)" @onclick="() => SetMode(AuthMode.Reset)">Reset</button>
+        </div>
+
+        <p class="eyebrow">@GetEyebrow()</p>
+        <h2>@GetTitle()</h2>
+        <p class="auth-copy">@GetFlowCopy()</p>
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="alert">@errorMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(successMessage))
+        {
+            <div class="success-alert">@successMessage</div>
+        }
+
+        <EditForm Model="loginModel" FormName="AxiForgeAccessForm" OnValidSubmit="SubmitAsync" class="auth-form">
+            <DataAnnotationsValidator />
+            @if (mode == AuthMode.Register)
+            {
+                <label>
+                    <span>Full name</span>
+                    <input @bind="fullName" autocomplete="name" placeholder="Student name" />
+                </label>
+            }
+            <label>
+                <span>Email</span>
+                <input @bind="loginModel.Email" autocomplete="email" placeholder="student@example.com" />
+            </label>
+            @if (mode != AuthMode.Reset)
+            {
+                <label>
+                    <span>Password</span>
+                    <input @bind="loginModel.Password" autocomplete="current-password" placeholder="Enter password" type="password" />
+                </label>
+            }
+            <button type="submit" disabled="@isBusy">@GetSubmitText()</button>
+        </EditForm>
+
+        <div class="auth-quick-actions">
+            <button type="button" class="auth-link-button" @onclick="() => SetMode(AuthMode.Register)" disabled="@isBusy">
+                Create Forge account
+            </button>
+            <button type="button" class="auth-link-button" @onclick="() => SetMode(AuthMode.Reset)" disabled="@isBusy">
+                Forgot password?
+            </button>
+        </div>
+    </div>
+</section>
+
+@code {
+    private enum AuthMode
+    {
+        Login,
+        Register,
+        Reset
+    }
+
+    private readonly LoginRequestDto loginModel = new();
+    private string fullName = string.Empty;
+    private bool isBusy;
+    private AuthMode mode = AuthMode.Login;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    /// <summary>
+    /// Runs login, forge-account creation, or reset-password request based on the active mode.
+    /// Returns no value because it updates auth state or visible access feedback.
+    /// </summary>
+    private async Task SubmitAsync()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Login.razor -> SubmitAsync");
+        try
+        {
+            isBusy = true;
+            errorMessage = string.Empty;
+            successMessage = string.Empty;
+
+            if (mode == AuthMode.Reset)
+            {
+                await RequestPasswordResetAsync();
+                return;
+            }
+
+            var result = mode == AuthMode.Register
+                ? await RegisterThenLoginIfNeededAsync()
+                : await ApiClient.LoginAsync(loginModel);
+
+            if (result == null)
+            {
+                errorMessage = mode == AuthMode.Register
+                    ? "Could not create this Forge account. Try Login if the email already exists."
+                    : "Login failed. Check your email and password.";
+                return;
+            }
+
+            CompleteAccess(result);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Login.razor -> SubmitAsync -> {ex.Message}");
+            errorMessage = "Access failed. Please try again.";
+        }
+        finally
+        {
+            isBusy = false;
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Login.razor -> SubmitAsync");
+        }
+    }
+
+    /// <summary>
+    /// Creates a new Forge account and falls back to login when the account already exists.
+    /// Returns authentication details so existing users can continue without a broken flow.
+    /// </summary>
+    private async Task<AuthResponseDto?> RegisterThenLoginIfNeededAsync()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Login.razor -> RegisterThenLoginIfNeededAsync");
+        try
+        {
+            var result = await ApiClient.RegisterAsync(
+                new RegisterRequestDto
+                {
+                    FullName = fullName,
+                    Email = loginModel.Email,
+                    Password = loginModel.Password
+                });
+
+            return result ?? await ApiClient.LoginAsync(loginModel);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Login.razor -> RegisterThenLoginIfNeededAsync -> {ex.Message}");
+            return null;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Login.razor -> RegisterThenLoginIfNeededAsync");
+        }
+    }
+
+    /// <summary>
+    /// Shows password-reset guidance for the entered email.
+    /// Returns no value because reset delivery is a later email-service integration.
+    /// </summary>
+    private async Task RequestPasswordResetAsync()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Login.razor -> RequestPasswordResetAsync");
+        try
+        {
+            if (string.IsNullOrWhiteSpace(loginModel.Email))
+            {
+                errorMessage = "Enter your email before requesting password reset.";
+                return;
+            }
+
+            var requested = await ApiClient.RequestPasswordResetAsync(new PasswordResetRequestDto
+            {
+                Email = loginModel.Email
+            });
+
+            if (!requested)
+            {
+                errorMessage = "Password reset request failed. Please try again.";
+                return;
+            }
+
+            successMessage = $"If {loginModel.Email} has AxiForge access, a reset link has been generated.";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Login.razor -> RequestPasswordResetAsync -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Login.razor -> RequestPasswordResetAsync");
+        }
+    }
+
+    /// <summary>
+    /// Stores the authenticated user and navigates to the requested return route.
+    /// Returns no value because it completes the current access flow.
+    /// </summary>
+    private void CompleteAccess(AuthResponseDto result)
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Login.razor -> CompleteAccess");
+        try
+        {
+            AuthState.SetUser(result);
+            Navigation.NavigateTo(ReturnUrl);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Login.razor -> CompleteAccess -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Login.razor -> CompleteAccess");
+        }
+    }
+
+    /// <summary>
+    /// Changes the active access mode.
+    /// Returns no value because it only updates the rendered access form.
+    /// </summary>
+    private void SetMode(AuthMode nextMode)
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Login.razor -> SetMode");
+        try
+        {
+            mode = nextMode;
+            errorMessage = string.Empty;
+            successMessage = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Login.razor -> SetMode -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Login.razor -> SetMode");
+        }
+    }
+
+    private string ReturnUrl => GetReturnUrl();
+
+    /// <summary>
+    /// Reads the optional returnUrl query string after login or registration.
+    /// Returns a local route so students land directly in the protected practice area.
+    /// </summary>
+    private string GetReturnUrl()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Login.razor -> GetReturnUrl");
+        try
+        {
+            var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+            return query.TryGetValue("returnUrl", out var returnUrl) &&
+                !string.IsNullOrWhiteSpace(returnUrl) &&
+                returnUrl.ToString().StartsWith("/", StringComparison.Ordinal)
+                    ? returnUrl.ToString()
+                    : "/practice";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Login.razor -> GetReturnUrl -> {ex.Message}");
+            return "/practice";
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Login.razor -> GetReturnUrl");
+        }
+    }
+
+    /// <summary>
+    /// Gets the submit button text for the active auth mode.
+    /// Returns user-facing command text for the access form.
+    /// </summary>
+    private string GetSubmitText()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Login.razor -> GetSubmitText");
+        try
+        {
+            return isBusy
+                ? "Please wait"
+                : mode switch
+                {
+                    AuthMode.Register => "Create Forge account",
+                    AuthMode.Reset => "Request reset link",
+                    _ => "Login to AxiForge"
+                };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Login.razor -> GetSubmitText -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Login.razor -> GetSubmitText");
+        }
+    }
+
+    private string GetTitle() => mode switch
+    {
+        AuthMode.Register => "Create your Forge account",
+        AuthMode.Reset => "Reset your password",
+        _ => "Login to AxiForge"
+    };
+
+    private string GetEyebrow() => mode switch
+    {
+        AuthMode.Register => "Forge Access",
+        AuthMode.Reset => "Password Recovery",
+        _ => "Student Access"
+    };
+
+    private string GetFlowCopy() => mode switch
+    {
+        AuthMode.Register => "Create access once, then continue into coding practice from AxiPlus or AxiForge.",
+        AuthMode.Reset => "Enter your email and we will prepare the reset flow for the account.",
+        _ => "Use your AxiForge credentials to continue coding practice."
+    };
+
+    private string GetModeClass(AuthMode targetMode) =>
+        mode == targetMode ? "active" : string.Empty;
+}

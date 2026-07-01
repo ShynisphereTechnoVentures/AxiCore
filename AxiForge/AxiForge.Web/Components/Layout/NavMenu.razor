@@ -1,0 +1,64 @@
+@inject AxiForge.Web.Services.AuthStateService AuthState
+@inject NavigationManager Navigation
+
+<aside class="forge-side-nav">
+    <nav>
+        <NavLink class="side-link" href="practice">
+            <span>Library</span>
+        </NavLink>
+        <NavLink class="side-link" href="roadmaps">
+            <span>Explore</span>
+        </NavLink>
+        <NavLink class="side-link" href="assessments">
+            <span>Study Plan</span>
+        </NavLink>
+        <NavLink class="side-link" href="dashboard">
+            <span>Dashboard</span>
+        </NavLink>
+    </nav>
+
+    <div class="side-section">
+        <div class="side-section-title">
+            <span>My Lists</span>
+            <strong>+</strong>
+        </div>
+        <a class="side-link compact" href="/practice">Favorite</a>
+    </div>
+
+    <div class="side-section account">
+        @if (AuthState.IsAuthenticated)
+        {
+            <span>@AuthState.CurrentUser?.FullName</span>
+            <button class="link-button" @onclick="Logout">Logout</button>
+        }
+        else
+        {
+            <a class="primary side-access" href="/login">Login</a>
+        }
+    </div>
+</aside>
+
+@code {
+    /// <summary>
+    /// Clears the local AxiForge session and returns the user to login.
+    /// Returns no value because navigation is handled by the Blazor shell.
+    /// </summary>
+    private void Logout()
+    {
+        Console.WriteLine("Entering -> NavMenu.razor -> Logout");
+        try
+        {
+            AuthState.Clear();
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> NavMenu.razor -> Logout -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> NavMenu.razor -> Logout");
+        }
+    }
+}

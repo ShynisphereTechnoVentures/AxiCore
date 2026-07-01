@@ -1,0 +1,287 @@
+@page "/practice"
+@using AxiForge.Application.DTOs.Coding
+@inject AxiForge.Web.Services.AxiForgeApiClient ApiClient
+@inject AxiForge.Web.Services.AuthStateService AuthState
+@inject NavigationManager Navigation
+
+<PageTitle>AxiForge Practice</PageTitle>
+
+@if (isAuthorized)
+{
+    <section class="leetcode-page">
+        <div class="problemset-main">
+            @if (!isLoading && problems.Count > 0)
+            {
+                <div class="feature-strip">
+                    @foreach (var card in TopicCards)
+                    {
+                        <div class="@card.ClassName">
+                            <span>@card.Label</span>
+                            <strong>@card.Title</strong>
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (!isLoading && TopicTags.Count > 0)
+            {
+                <div class="topic-cloud">
+                    @foreach (var topic in TopicTags)
+                    {
+                        <button type="button" @onclick="() => SelectTopic(topic.Name)">
+                            @topic.Name <span>@topic.Count</span>
+                        </button>
+                    }
+                </div>
+            }
+
+            <div class="category-pills">
+                <button class="@(string.IsNullOrWhiteSpace(selectedTopic) ? "active" : string.Empty)" type="button" @onclick="ClearFilters">All Topics</button>
+                @foreach (var topic in TopicTags.Take(6))
+                {
+                    <button class="@(selectedTopic == topic.Name ? "active" : string.Empty)" type="button" @onclick="() => SelectTopic(topic.Name)">@topic.Name</button>
+                }
+            </div>
+
+            <div class="question-toolbar">
+                <div class="question-search">
+                    <input type="search" placeholder="Search questions" @bind="searchText" @bind:event="oninput" />
+                </div>
+                <select @bind="selectedDifficulty">
+                    <option value="">Difficulty</option>
+                    @foreach (var difficulty in Difficulties)
+                    {
+                        <option value="@difficulty">@difficulty</option>
+                    }
+                </select>
+                <span class="solved-counter">@SolvedCount/@problems.Count Solved</span>
+            </div>
+
+            @if (isLoading)
+            {
+                <p class="loading-copy">Loading practice problems...</p>
+            }
+            else if (problems.Count == 0)
+            {
+                <div class="empty-state-panel">
+                    <h2>No practice content published yet.</h2>
+                    <p>Once an admin adds problem statements, test cases, topics, and difficulty levels, they will appear here automatically.</p>
+                </div>
+            }
+            else if (FilteredProblems.Count == 0)
+            {
+                <div class="empty-state-panel">
+                    <h2>No matching problems.</h2>
+                    <p>Clear filters or search again after more database content is published.</p>
+                </div>
+            }
+            else
+            {
+                <div class="leetcode-question-list">
+                    @foreach (var problem in FilteredProblems.Select((value, index) => new { value, index }))
+                    {
+                        <a class="leetcode-row" href="@($"/practice/{problem.value.Id}")">
+                            <span class="row-status"></span>
+                            <strong>@(problem.index + 1). @problem.value.Title</strong>
+                            <span>@problem.value.Topic</span>
+                            <span class="@GetDifficultyClass(problem.value.Difficulty)">@ShortDifficulty(problem.value.Difficulty)</span>
+                            <span class="row-topic">Open</span>
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+
+        <aside class="problemset-rail">
+            <div class="daily-card">
+                <div class="daily-head">
+                    <strong>Practice</strong>
+                    <span>Database driven</span>
+                </div>
+                <div class="calendar-grid">
+                    @foreach (var day in Enumerable.Range(1, 30))
+                    {
+                        <span class="@(day == DateTime.Today.Day ? "today" : string.Empty)">@day</span>
+                    }
+                </div>
+                <div class="weekly-strip">
+                    <strong>Published Problems</strong>
+                    <span>@problems.Count available</span>
+                </div>
+            </div>
+
+            <div class="company-card">
+                <h2>Published Topics</h2>
+                <div class="company-tags">
+                    @foreach (var topic in TopicTags.Take(12))
+                    {
+                        <span>@topic.Name <strong>@topic.Count</strong></span>
+                    }
+                </div>
+            </div>
+        </aside>
+    </section>
+}
+
+@code {
+    private List<CodingProblemSummaryDto> problems = new();
+    private string searchText = string.Empty;
+    private string selectedTopic = string.Empty;
+    private string selectedDifficulty = string.Empty;
+    private bool isLoading = true;
+    private bool isAuthorized;
+    private int SolvedCount => 0;
+    private readonly string[] topicCardClasses =
+    {
+        "feature-card feature-dark",
+        "feature-card feature-green",
+        "feature-card feature-purple",
+        "feature-card feature-blue"
+    };
+
+    private List<(string Label, string Title, string ClassName)> TopicCards => TopicTags
+        .Take(4)
+        .Select((topic, index) => ($"{topic.Count} published problem{(topic.Count == 1 ? string.Empty : "s")}", topic.Name, topicCardClasses[index % topicCardClasses.Length]))
+        .ToList();
+
+    private List<(string Name, int Count)> TopicTags => problems
+        .Where(x => !string.IsNullOrWhiteSpace(x.Topic))
+        .GroupBy(x => x.Topic)
+        .Select(x => (x.Key, x.Count()))
+        .OrderBy(x => x.Key)
+        .ToList();
+
+    private List<string> Difficulties => problems
+        .Select(x => x.Difficulty)
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+
+    private List<CodingProblemSummaryDto> FilteredProblems => problems
+        .Where(x => string.IsNullOrWhiteSpace(selectedTopic) || x.Topic == selectedTopic)
+        .Where(x => string.IsNullOrWhiteSpace(selectedDifficulty) || x.Difficulty == selectedDifficulty)
+        .Where(x =>
+            string.IsNullOrWhiteSpace(searchText) ||
+            x.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            x.Topic.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+            x.Difficulty.Contains(searchText, StringComparison.OrdinalIgnoreCase))
+        .OrderBy(x => x.Topic)
+        .ThenBy(x => x.Title)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Practice.razor -> OnInitializedAsync");
+        try
+        {
+            if (!AuthState.IsAuthenticated)
+            {
+                Navigation.NavigateTo("/login?returnUrl=/practice");
+                return;
+            }
+
+            isAuthorized = true;
+            problems = await ApiClient.GetProblemsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Practice.razor -> OnInitializedAsync -> {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Practice.razor -> OnInitializedAsync");
+        }
+    }
+
+    /// <summary>
+    /// Applies a topic filter from database-backed topic data.
+    /// Returns no value because the question table is recalculated from component state.
+    /// </summary>
+    private void SelectTopic(string topic)
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Practice.razor -> SelectTopic");
+        try
+        {
+            selectedTopic = topic;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Practice.razor -> SelectTopic -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Practice.razor -> SelectTopic");
+        }
+    }
+
+    /// <summary>
+    /// Clears local problem bank filters.
+    /// Returns no value because the computed list updates the visible catalog.
+    /// </summary>
+    private void ClearFilters()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Practice.razor -> ClearFilters");
+        try
+        {
+            searchText = string.Empty;
+            selectedTopic = string.Empty;
+            selectedDifficulty = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Practice.razor -> ClearFilters -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Practice.razor -> ClearFilters");
+        }
+    }
+
+    /// <summary>
+    /// Builds the difficulty badge CSS class.
+    /// Returns a class string so difficulty states render consistently in the bank.
+    /// </summary>
+    private static string GetDifficultyClass(string difficulty)
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Practice.razor -> GetDifficultyClass");
+        try
+        {
+            return $"lc-difficulty lc-difficulty-{difficulty.ToLowerInvariant()}";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Practice.razor -> GetDifficultyClass -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Practice.razor -> GetDifficultyClass");
+        }
+    }
+
+    /// <summary>
+    /// Shortens difficulty text for dense question rows.
+    /// Returns a display label for the problem table.
+    /// </summary>
+    private static string ShortDifficulty(string difficulty)
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Practice.razor -> ShortDifficulty");
+        try
+        {
+            return difficulty.Equals("Medium", StringComparison.OrdinalIgnoreCase) ? "Med." : difficulty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Practice.razor -> ShortDifficulty -> {ex.Message}");
+            throw;
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Practice.razor -> ShortDifficulty");
+        }
+    }
+}

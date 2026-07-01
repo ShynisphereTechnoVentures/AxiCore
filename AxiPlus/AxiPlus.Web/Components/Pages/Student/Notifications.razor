@@ -1,0 +1,223 @@
+@page "/student/notifications"
+
+@using AxiPlus.Domain.Enums
+@using AxiPlus.Web.Models.Operations
+@using AxiPlus.Web.Models.StudentPortal
+@using AxiPlus.Web.Services
+
+@inject StudentPortalApiService StudentPortalService
+@inject OperationsApiService OperationsService
+
+<MudText Typo="Typo.h4" Class="mb-6">Notifications</MudText>
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-5 mb-4">
+        <MudText Typo="Typo.h6">Meeting Requests</MudText>
+        <MudDivider Class="my-3" />
+
+        @if (meetingRequests.Count == 0)
+       {
+            <MudAlert Severity="Severity.Info">No meeting requests.</MudAlert>
+        }
+        else
+       {
+            <MudStack Spacing="2">
+                @foreach (var request in meetingRequests)
+               {
+                    <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                        <MudStack Row="true"
+                                  Justify="Justify.SpaceBetween"
+                                  AlignItems="AlignItems.Start">
+                            <div>
+                                <MudText Typo="Typo.subtitle1">
+                                    @request.MentorName
+                                </MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    @request.ScheduledAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                </MudText>
+                                <MudText Class="mt-2">@request.Reason</MudText>
+                            </div>
+
+                            <MudChip T="string" Color="@GetMeetingColor(request.Status)">
+                                @request.Status
+                            </MudChip>
+                        </MudStack>
+
+                        <div class="action-row mt-3">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Success"
+                                       Disabled="@isSaving"
+                                       OnClick="@(() => RespondMeetingAsync(request.Id, MeetingRequestStatus.Accepted))">
+                                Accept
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Error"
+                                       Disabled="@isSaving"
+                                       OnClick="@(() => RespondMeetingAsync(request.Id, MeetingRequestStatus.Rejected))">
+                                Reject
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       Href="@request.MeetingLink"
+                                       Target="_blank"
+                                       Disabled="@string.IsNullOrWhiteSpace(request.MeetingLink)">
+                                Join
+                            </MudButton>
+                        </div>
+                    </MudPaper>
+                }
+            </MudStack>
+        }
+    </MudPaper>
+
+    <MudPaper Class="pa-5">
+        <MudStack Row="true"
+                  Justify="Justify.SpaceBetween"
+                  AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h6">Latest Updates</MudText>
+            <MudChip T="string" Color="Color.Info">
+                @notifications.Count(x => !x.IsRead) unread
+            </MudChip>
+        </MudStack>
+
+        <MudDivider Class="my-3" />
+
+        @if (notifications.Count == 0)
+       {
+            <MudAlert Severity="Severity.Info">No notifications yet.</MudAlert>
+        }
+        else
+       {
+            <MudStack Spacing="2">
+                @foreach (var notification in notifications)
+               {
+                    <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                        <MudStack Row="true"
+                                  Justify="Justify.SpaceBetween"
+                                  AlignItems="AlignItems.Start">
+                            <div>
+                                <MudStack Row="true"
+                                          AlignItems="AlignItems.Center"
+                                          Spacing="2">
+                                    <MudText Typo="Typo.subtitle1">
+                                        @notification.Title
+                                    </MudText>
+                                    <MudChip T="string"
+                                             Color="@GetTypeColor(notification.Type)"
+                                             Size="Size.Small">
+                                        @notification.Type
+                                    </MudChip>
+                                </MudStack>
+
+                                <MudText Class="mt-2">
+                                    @notification.Message
+                                </MudText>
+                                <MudText Typo="Typo.caption"
+                                         Color="Color.Secondary">
+                                    @notification.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                </MudText>
+                            </div>
+
+                            @if (!notification.IsRead)
+                           {
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Primary"
+                                           OnClick="@(() => MarkReadAsync(notification))">
+                                    Mark read
+                                </MudButton>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                }
+            </MudStack>
+        }
+    </MudPaper>
+}
+
+@code{
+    private readonly List<StudentNotificationModel> notifications = new();
+    private readonly List<MeetingRequestModel> meetingRequests = new();
+    private bool isLoading = true;
+    private bool isSaving;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        await LoadNotificationsAsync();
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadNotificationsAsync()
+   {
+        notifications.Clear();
+        notifications.AddRange(await StudentPortalService.GetNotificationsAsync());
+        meetingRequests.Clear();
+        meetingRequests.AddRange(await OperationsService.GetStudentMeetingRequestsAsync());
+    }
+
+    private async Task RespondMeetingAsync(
+        Guid requestId,
+        MeetingRequestStatus status)
+   {
+        isSaving = true;
+
+        var updated = await OperationsService.RespondToMeetingRequestAsync(
+            requestId,
+            new RespondMeetingRequestModel
+           {
+                Status = status,
+                StudentResponseNote = status == MeetingRequestStatus.Accepted
+                    ? "Accepted by student."
+                    : "Rejected by student."
+            });
+
+        isSaving = false;
+
+        if (updated != null)
+       {
+            await LoadNotificationsAsync();
+        }
+    }
+
+    private async Task MarkReadAsync(StudentNotificationModel notification)
+   {
+        if (await StudentPortalService.MarkNotificationReadAsync(notification.Id))
+       {
+            notification.IsRead = true;
+        }
+    }
+
+    private static Color GetTypeColor(string type)
+   {
+        return type switch
+       {
+            "Assignment" => Color.Warning,
+            "LiveClass" => Color.Success,
+            "Attendance" => Color.Info,
+            "MeetingRequest" => Color.Primary,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetMeetingColor(MeetingRequestStatus status)
+   {
+        return status switch
+       {
+            MeetingRequestStatus.Accepted => Color.Success,
+            MeetingRequestStatus.Completed => Color.Success,
+            MeetingRequestStatus.Rejected => Color.Error,
+            MeetingRequestStatus.Called => Color.Warning,
+            _ => Color.Info
+        };
+    }
+}

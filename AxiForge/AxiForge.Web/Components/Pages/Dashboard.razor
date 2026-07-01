@@ -1,0 +1,68 @@
+@page "/dashboard"
+@inject AxiForge.Web.Services.AxiForgeApiClient ApiClient
+@inject AxiForge.Web.Services.AuthStateService AuthState
+
+<PageTitle>AxiForge Dashboard</PageTitle>
+
+@if (dashboard == null)
+{
+    <section class="forge-panel">
+        <h1>Student Dashboard</h1>
+        <p>@message</p>
+        <a class="primary" href="/login">Login</a>
+    </section>
+}
+else
+{
+    <section class="forge-panel">
+        <p class="eyebrow">Student Dashboard</p>
+        <h1>Welcome, @dashboard.StudentName</h1>
+
+        <div class="metric-grid">
+            <div>
+                <strong>@dashboard.SolvedProblems</strong>
+                <span>Solved problems</span>
+            </div>
+            <div>
+                <strong>@dashboard.ActiveRoadmaps</strong>
+                <span>Active roadmaps</span>
+            </div>
+            <div>
+                <strong>@dashboard.PendingAssessments</strong>
+                <span>Pending assessments</span>
+            </div>
+        </div>
+
+        <p class="lead">@dashboard.CurrentFocus</p>
+    </section>
+}
+
+@code {
+    private AxiForge.Application.DTOs.Dashboard.StudentDashboardDto? dashboard;
+    private string message = "Checking your AxiForge session...";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Console.WriteLine("Entering -> Dashboard.razor -> OnInitializedAsync");
+        try
+        {
+            if (!AuthState.IsAuthenticated)
+            {
+                message = "Please login to view your dashboard.";
+                return;
+            }
+
+            dashboard = await ApiClient.GetDashboardAsync();
+            message = dashboard == null ? "Unable to load dashboard." : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> Dashboard.razor -> OnInitializedAsync -> {ex.Message}");
+            message = "Unable to load dashboard.";
+        }
+        finally
+        {
+            Console.WriteLine("Exiting -> Dashboard.razor -> OnInitializedAsync");
+        }
+    }
+}

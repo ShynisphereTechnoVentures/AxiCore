@@ -1,0 +1,419 @@
+@page "/student/profile"
+
+@using AxiPlus.Web.Models
+@using AxiPlus.Web.Services
+
+@inject StudentService StudentService
+@inject ISnackbar Snackbar
+
+<div class="page-shell">
+    <div class="page-header">
+        <div>
+            <MudText Typo="Typo.h4">Profile</MudText>
+            <MudText Typo="Typo.body2">Student account details</MudText>
+        </div>
+    </div>
+
+    @if (!loaded)
+   {
+        <div class="loading-state">
+            <MudProgressCircular Indeterminate="true" />
+        </div>
+    }
+    else if (profile == null)
+   {
+        <MudAlert Severity="Severity.Warning">
+            Unable to load profile.
+        </MudAlert>
+    }
+    else
+   {
+        <MudGrid>
+            <MudItem xs="12" md="7">
+                <MudPaper Class="surface-card pa-5">
+                    <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.caption" Class="metric-label">Name</MudText>
+                    <MudText Typo="Typo.h6">@profile.FullName</MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudText Typo="Typo.caption" Class="metric-label">Email</MudText>
+                    <MudText Typo="Typo.h6">@profile.Email</MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.caption" Class="metric-label">Batch</MudText>
+                    <MudText>@profile.Batch</MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.caption" Class="metric-label">Track</MudText>
+                    <MudText>@profile.Track</MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.caption" Class="metric-label">Joined</MudText>
+                    <MudText>@profile.JoinedDate.ToString("dd MMM yyyy")</MudText>
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudText Typo="Typo.caption" Class="metric-label">Mobile</MudText>
+                    <MudText>@profile.PhoneNumber</MudText>
+                </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="5">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6">Billing</MudText>
+                    <MudDivider Class="my-3" />
+
+                    @if (profile.Billing == null)
+                   {
+                        <MudAlert Severity="Severity.Warning">
+                            Billing details are not available.
+                        </MudAlert>
+                    }
+                    else
+                   {
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText>Status</MudText>
+                                <MudChip T="string" Color="@GetBillingColor(profile.Billing.Status)">
+                                    @profile.Billing.Status
+                                </MudChip>
+                            </MudStack>
+
+                            <MudText>
+                                Plan: @profile.Billing.CurrentPlanName
+                            </MudText>
+                            <MudText>
+                                Fee: @profile.Billing.Currency @profile.Billing.MonthlyFee / month
+                            </MudText>
+                            <MudText>
+                                Due: @profile.Billing.NextDueDate.ToLocalTime().ToString("dd MMM yyyy")
+                            </MudText>
+                            <MudText>
+                                Grace ends: @profile.Billing.GraceEndsAt.ToLocalTime().ToString("dd MMM yyyy")
+                            </MudText>
+
+                            @if (profile.Billing.IsLocked)
+                           {
+                                <MudAlert Severity="Severity.Error">
+                                    Access is locked until payment is completed.
+                                </MudAlert>
+                            }
+                            else
+                           {
+                                <MudAlert Severity="Severity.Info">
+                                    @profile.Billing.DaysRemaining day(s) remaining in the payment window.
+                                </MudAlert>
+                            }
+
+                            <MudTextField T="string"
+                                          Label="UPI ID"
+                                          Variant="Variant.Outlined"
+                                          @bind-Value="upiId" />
+
+                            <MudCheckBox T="bool"
+                                         Label="Enable auto payment"
+                                         @bind-Value="autoPayEnabled" />
+
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       Disabled="@isSavingBilling"
+                                       OnClick="SaveBillingAsync">
+                                Save Billing
+                            </MudButton>
+
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Success"
+                                       Disabled="@isSavingBilling"
+                                       OnClick="PayWithUpiAsync">
+                                Pay with UPI
+                            </MudButton>
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="5">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6">Upcoming Payment</MudText>
+                    <MudDivider Class="my-3" />
+
+                    @if (upcomingPayment == null)
+                   {
+                        <MudAlert Severity="Severity.Info">
+                            Upcoming payment details are not available.
+                        </MudAlert>
+                    }
+                    else
+                   {
+                        <MudStack Spacing="2">
+                            <MudText>
+                                Amount: @upcomingPayment.Currency @upcomingPayment.Amount
+                            </MudText>
+                            <MudText>
+                                Due: @upcomingPayment.DueDate.ToLocalTime().ToString("dd MMM yyyy")
+                            </MudText>
+                            <MudText>
+                                Grace ends: @upcomingPayment.GraceEndsAt.ToLocalTime().ToString("dd MMM yyyy")
+                            </MudText>
+                            <MudChip T="string" Color="@GetPaymentColor(upcomingPayment.Status)">
+                                @upcomingPayment.Status
+                            </MudChip>
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="7">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6">Upgrade Plan</MudText>
+                    <MudDivider Class="my-3" />
+
+                    <MudGrid>
+                        @foreach (var plan in plans)
+                       {
+                            <MudItem xs="12" md="4">
+                                <MudPaper Class="list-card pa-4">
+                                    <MudStack Spacing="2">
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                            <MudText Typo="Typo.subtitle1">@plan.Name</MudText>
+                                            @if (plan.IsCurrent)
+                                           {
+                                                <MudChip T="string" Color="Color.Success" Size="Size.Small">
+                                                    Current
+                                                </MudChip>
+                                            }
+                                        </MudStack>
+
+                                        <MudText Typo="Typo.body2" Class="muted-text">
+                                            @plan.Description
+                                        </MudText>
+                                        <MudText Typo="Typo.h6">
+                                            @plan.Currency @plan.MonthlyFee
+                                        </MudText>
+
+                                        @foreach (var feature in plan.Features)
+                                       {
+                                            <MudText Typo="Typo.caption">
+                                                @feature
+                                            </MudText>
+                                        }
+
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Disabled="@(isSavingBilling || plan.IsCurrent)"
+                                                   OnClick="@(() => SelectPlanAsync(plan.Code))">
+                                            @(plan.IsCurrent ? "Selected" : "Select")
+                                        </MudButton>
+                                    </MudStack>
+                                </MudPaper>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12">
+                <MudPaper Class="surface-card pa-5">
+                    <MudText Typo="Typo.h6">Payment History</MudText>
+                    <MudDivider Class="my-3" />
+
+                    @if (payments.Count == 0)
+                   {
+                        <MudAlert Severity="Severity.Info">
+                            Payment history will appear after a payment is initiated.
+                        </MudAlert>
+                    }
+                    else
+                   {
+                        <MudStack Spacing="2">
+                            @foreach (var payment in payments)
+                           {
+                                <MudPaper Class="list-card pa-3">
+                                    <MudGrid>
+                                        <MudItem xs="12" md="3">
+                                            <MudText Typo="Typo.subtitle2">
+                                                @payment.Currency @payment.Amount
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Class="muted-text">
+                                                @payment.Method
+                                            </MudText>
+                                        </MudItem>
+
+                                        <MudItem xs="12" md="3">
+                                            <MudText Class="metric-label">Reference</MudText>
+                                            <MudText Typo="Typo.body2">@payment.ProviderReference</MudText>
+                                        </MudItem>
+
+                                        <MudItem xs="12" md="2">
+                                            <MudText Class="metric-label">Due</MudText>
+                                            <MudText Typo="Typo.body2">
+                                                @payment.DueDate.ToLocalTime().ToString("dd MMM yyyy")
+                                            </MudText>
+                                        </MudItem>
+
+                                        <MudItem xs="12" md="2">
+                                            <MudText Class="metric-label">Created</MudText>
+                                            <MudText Typo="Typo.body2">
+                                                @payment.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")
+                                            </MudText>
+                                        </MudItem>
+
+                                        <MudItem xs="12" md="2">
+                                            <MudChip T="string" Color="@GetPaymentColor(payment.Status)">
+                                                @payment.Status
+                                            </MudChip>
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudPaper>
+                            }
+                        </MudStack>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</div>
+
+@code{
+    private StudentProfileDto? profile;
+    private readonly List<StudentPaymentModel> payments = new();
+    private readonly List<StudentPlanModel> plans = new();
+    private StudentPaymentModel? upcomingPayment;
+    private bool loaded;
+    private bool isSavingBilling;
+    private string upiId = string.Empty;
+    private bool autoPayEnabled;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        profile = await StudentService.GetProfileAsync();
+        payments.Clear();
+        payments.AddRange(await StudentService.GetPaymentsAsync());
+        plans.Clear();
+        plans.AddRange(await StudentService.GetPlansAsync());
+        upcomingPayment = await StudentService.GetUpcomingPaymentAsync();
+
+        if (profile?.Billing != null)
+       {
+            upiId = profile.Billing.UpiId;
+            autoPayEnabled = profile.Billing.AutoPayEnabled;
+        }
+
+        loaded = true;
+
+        StateHasChanged();
+    }
+
+    private async Task SaveBillingAsync()
+   {
+        isSavingBilling = true;
+
+        var billing = await StudentService.UpdateBillingAsync(
+            new UpdateStudentBillingModel
+           {
+                UpiId = upiId,
+                AutoPayEnabled = autoPayEnabled
+            });
+
+        isSavingBilling = false;
+
+        if (billing == null || profile == null)
+       {
+            Snackbar.Add("Billing details could not be saved.", Severity.Error);
+            return;
+        }
+
+        profile.Billing = billing;
+        Snackbar.Add("Billing details saved.", Severity.Success);
+    }
+
+    private async Task PayWithUpiAsync()
+   {
+        if (string.IsNullOrWhiteSpace(upiId))
+       {
+            Snackbar.Add("Enter your UPI ID.", Severity.Error);
+            return;
+        }
+
+        isSavingBilling = true;
+
+        var payment = await StudentService.StartUpiPaymentAsync(
+            new UpdateStudentBillingModel
+           {
+                UpiId = upiId,
+                AutoPayEnabled = autoPayEnabled
+            });
+
+        profile = await StudentService.GetProfileAsync();
+        payments.Clear();
+        payments.AddRange(await StudentService.GetPaymentsAsync());
+        upcomingPayment = await StudentService.GetUpcomingPaymentAsync();
+        isSavingBilling = false;
+
+        if (payment == null)
+       {
+            Snackbar.Add("UPI payment could not be started.", Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(
+            $"UPI payment request created:{payment.ProviderReference}",
+            Severity.Success);
+    }
+
+    private async Task SelectPlanAsync(string planCode)
+   {
+        isSavingBilling = true;
+
+        var billing = await StudentService.SelectPlanAsync(planCode);
+
+        if (billing == null || profile == null)
+       {
+            isSavingBilling = false;
+            Snackbar.Add("Plan could not be selected.", Severity.Error);
+            return;
+        }
+
+        profile.Billing = billing;
+        plans.Clear();
+        plans.AddRange(await StudentService.GetPlansAsync());
+        upcomingPayment = await StudentService.GetUpcomingPaymentAsync();
+        isSavingBilling = false;
+        Snackbar.Add("Plan updated. Complete payment to continue.", Severity.Success);
+    }
+
+    private static Color GetBillingColor(AxiPlus.Domain.Enums.BillingStatus status)
+   {
+        return status switch
+       {
+            AxiPlus.Domain.Enums.BillingStatus.Active => Color.Success,
+            AxiPlus.Domain.Enums.BillingStatus.Trial => Color.Info,
+            AxiPlus.Domain.Enums.BillingStatus.GracePeriod => Color.Warning,
+            AxiPlus.Domain.Enums.BillingStatus.Locked => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private static Color GetPaymentColor(AxiPlus.Domain.Enums.PaymentStatus status)
+   {
+        return status switch
+       {
+            AxiPlus.Domain.Enums.PaymentStatus.Paid => Color.Success,
+            AxiPlus.Domain.Enums.PaymentStatus.Pending => Color.Warning,
+            AxiPlus.Domain.Enums.PaymentStatus.Failed => Color.Error,
+            _ => Color.Info
+        };
+    }
+}

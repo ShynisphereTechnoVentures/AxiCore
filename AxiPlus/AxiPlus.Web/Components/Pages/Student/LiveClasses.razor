@@ -1,0 +1,160 @@
+@page "/student/liveclasses"
+
+@using AxiPlus.Web.Models.StudentPortal
+@using AxiPlus.Web.Services
+
+@inject StudentPortalApiService StudentPortalService
+
+<MudText Typo="Typo.h4" Class="mb-6">Live Classes</MudText>
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-5 mb-4">
+                <MudText Typo="Typo.h6">Today's Sessions</MudText>
+                <MudDivider Class="my-3" />
+
+                @if (!TodayClasses.Any())
+               {
+                    <MudAlert Severity="Severity.Info">
+                        No live session is scheduled for today.
+                    </MudAlert>
+                }
+                else
+               {
+                    <MudStack Spacing="2">
+                        @foreach (var item in TodayClasses)
+                       {
+                            @RenderClassItem(item, true)
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.h6">Upcoming Classes</MudText>
+                <MudDivider Class="my-3" />
+
+                @if (!UpcomingClasses.Any())
+               {
+                    <MudText Color="Color.Secondary">
+                        Upcoming lesson sessions will appear here.
+                    </MudText>
+                }
+                else
+               {
+                    <MudStack Spacing="2">
+                        @foreach (var item in UpcomingClasses)
+                       {
+                            @RenderClassItem(item, false)
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.h6">Class Status</MudText>
+                <MudDivider Class="my-3" />
+                <MudStack Spacing="2">
+                    <MudChip T="string" Color="Color.Success">
+                        @LiveCount live now
+                    </MudChip>
+                    <MudChip T="string" Color="Color.Info">
+                        @UpcomingClasses.Count upcoming
+                    </MudChip>
+                    <MudChip T="string" Color="Color.Default">
+                        @CompletedClasses.Count completed
+                    </MudChip>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code{
+    private readonly List<StudentLiveClassModel> classes = new();
+    private bool isLoading = true;
+
+    private List<StudentLiveClassModel> TodayClasses => classes
+        .Where(x => x.StartTime.ToLocalTime().Date == DateTime.Today)
+        .OrderBy(x => x.StartTime)
+        .ToList();
+
+    private List<StudentLiveClassModel> UpcomingClasses => classes
+        .Where(x => x.StartTime.ToLocalTime() > DateTime.Now)
+        .OrderBy(x => x.StartTime)
+        .ToList();
+
+    private List<StudentLiveClassModel> CompletedClasses => classes
+        .Where(x => x.Status == "Completed")
+        .ToList();
+
+    private int LiveCount => classes.Count(x => x.Status == "Live");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        classes.Clear();
+        classes.AddRange(await StudentPortalService.GetLiveClassesAsync());
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private RenderFragment RenderClassItem(
+        StudentLiveClassModel item,
+        bool showJoin) => @<MudPaper Class="pa-4" Elevation="0" Outlined="true">
+        <MudStack Row="true"
+                  Justify="Justify.SpaceBetween"
+                  AlignItems="AlignItems.Center">
+            <div>
+                <MudText Typo="Typo.subtitle1">@item.Title</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @item.StartTime.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                    -
+                    @item.EndTime.ToLocalTime().ToString("hh:mm tt")
+                </MudText>
+                <MudText Typo="Typo.caption">
+                    Attendance: @item.AttendanceStatus
+                </MudText>
+            </div>
+
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudChip T="string" Color="@GetStatusColor(item.Status)">
+                    @item.Status
+                </MudChip>
+
+                @if (showJoin || item.Status == "Live")
+               {
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Success"
+                               Href="@item.MeetingLink"
+                               Target="_blank">
+                        Join
+                    </MudButton>
+                }
+            </MudStack>
+        </MudStack>
+    </MudPaper>;
+
+    private static Color GetStatusColor(string status)
+   {
+        return status switch
+       {
+            "Live" => Color.Success,
+            "Upcoming" => Color.Info,
+            "Completed" => Color.Default,
+            _ => Color.Secondary
+        };
+    }
+}

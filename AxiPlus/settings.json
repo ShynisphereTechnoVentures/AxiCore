@@ -1,0 +1,5 @@
+{
+    "dotnet.defaultSolution": "AxiPlus.sln",
+    "editor.formatOnSave": true,
+    "files.autoSave": "afterDelay"
+}

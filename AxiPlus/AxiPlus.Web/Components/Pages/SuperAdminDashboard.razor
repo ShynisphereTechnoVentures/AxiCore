@@ -1,0 +1,12 @@
+@page "/superadmin/dashboard"
+
+@inject NavigationManager Navigation
+
+<PageTitle>Super Admin Dashboard</PageTitle>
+
+@code{
+    protected override void OnInitialized()
+   {
+        Navigation.NavigateTo("/admin/dashboard", true);
+    }
+}

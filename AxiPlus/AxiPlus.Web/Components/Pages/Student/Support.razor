@@ -1,0 +1,209 @@
+@page "/student/support"
+
+@using AxiPlus.Web.Models.StudentPortal
+@using AxiPlus.Web.Services
+
+@inject StudentPortalApiService StudentPortalService
+
+<MudText Typo="Typo.h4" Class="mb-6">Support Center</MudText>
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.h6">Ask for Help</MudText>
+                <MudDivider Class="my-3" />
+                <MudTextField T="string"
+                              Label="Subject"
+                              Variant="Variant.Outlined"
+                              @bind-Value="subject"
+                              Class="mb-3" />
+                <MudTextField T="string"
+                              Label="Message"
+                              Variant="Variant.Outlined"
+                              Lines="5"
+                              @bind-Value="message"
+                              Class="mb-4" />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Disabled="@isSubmitting"
+                           OnClick="SubmitTicketAsync">
+                    Submit Request
+                </MudButton>
+
+                @if (!string.IsNullOrWhiteSpace(statusMessage))
+               {
+                    <MudAlert Severity="@statusSeverity"
+                              Dense="true"
+                              Class="mt-4">
+                        @statusMessage
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-5">
+                <MudText Typo="Typo.h6">Recent Requests</MudText>
+                <MudDivider Class="my-3" />
+
+                @if (tickets.Count == 0)
+               {
+                    <MudText Color="Color.Secondary">
+                        Support conversations will appear here.
+                    </MudText>
+                }
+                else
+               {
+                    <MudStack Spacing="2">
+                        @foreach (var ticket in tickets)
+                       {
+                            <MudPaper Class="pa-4" Elevation="0" Outlined="true">
+                                <MudStack Row="true"
+                                          Justify="Justify.SpaceBetween"
+                                          AlignItems="AlignItems.Start">
+                                    <div>
+                                        <MudText Typo="Typo.subtitle1">
+                                            @ticket.Subject
+                                        </MudText>
+                                        <MudText Typo="Typo.body2"
+                                                 Class="mt-2">
+                                            @ticket.Message
+                                        </MudText>
+                                        <MudText Typo="Typo.caption"
+                                                 Color="Color.Secondary">
+                                            @ticket.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")
+                                        </MudText>
+                                    </div>
+
+                                    <MudChip T="string"
+                                             Color="@GetTicketColor(ticket)">
+                                        @ticket.Status
+                                    </MudChip>
+                                </MudStack>
+
+                                @if (!string.IsNullOrWhiteSpace(ticket.MentorResponse))
+                               {
+                                    <MudAlert Severity="Severity.Info"
+                                              Dense="true"
+                                              Class="mt-3">
+                                        Mentor: @ticket.MentorResponse
+                                    </MudAlert>
+                                }
+                            </MudPaper>
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code{
+    [SupplyParameterFromQuery(Name = "lessonId")]
+    private string? LessonId{get;set; }
+
+    [SupplyParameterFromQuery(Name = "lessonTitle")]
+    private string? LessonTitle{get;set; }
+
+    private readonly List<SupportTicketModel> tickets = new();
+    private string subject = string.Empty;
+    private string message = string.Empty;
+    private string statusMessage = string.Empty;
+    private Severity statusSeverity = Severity.Info;
+    private bool isLoading = true;
+    private bool isSubmitting;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+   {
+        if (!firstRender)
+       {
+            return;
+        }
+
+        await LoadTicketsAsync();
+        ApplyLessonContext();
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private void ApplyLessonContext()
+   {
+        if (string.IsNullOrWhiteSpace(LessonId) &&
+            string.IsNullOrWhiteSpace(LessonTitle))
+       {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(subject))
+       {
+            subject = string.IsNullOrWhiteSpace(LessonTitle)
+                ? "Lesson support request"
+                : $"Lesson support:{LessonTitle}";
+        }
+
+        if (string.IsNullOrWhiteSpace(message))
+       {
+            message = string.IsNullOrWhiteSpace(LessonId)
+                ? "I need help with this lesson."
+                : $"I need help with this lesson.\nLesson ID:{LessonId}";
+        }
+    }
+
+    private async Task LoadTicketsAsync()
+   {
+        tickets.Clear();
+        tickets.AddRange(await StudentPortalService.GetSupportTicketsAsync());
+    }
+
+    private async Task SubmitTicketAsync()
+   {
+        if (string.IsNullOrWhiteSpace(subject) ||
+            string.IsNullOrWhiteSpace(message))
+       {
+            statusSeverity = Severity.Warning;
+            statusMessage = "Add a subject and message before submitting.";
+            return;
+        }
+
+        isSubmitting = true;
+
+        var created = await StudentPortalService.CreateSupportTicketAsync(
+            new CreateSupportTicketModel
+           {
+                Subject = subject,
+                Message = message
+            });
+
+        if (created == null)
+       {
+            statusSeverity = Severity.Error;
+            statusMessage = "Request could not be submitted. Please try again.";
+        }
+        else
+       {
+            subject = string.Empty;
+            message = string.Empty;
+            statusSeverity = Severity.Success;
+            statusMessage = "Support request submitted.";
+            await LoadTicketsAsync();
+        }
+
+        isSubmitting = false;
+    }
+
+    private static Color GetTicketColor(SupportTicketModel ticket)
+   {
+        return ticket.Status switch
+       {
+            AxiPlus.Domain.Enums.SupportTicketStatus.Resolved => Color.Success,
+            AxiPlus.Domain.Enums.SupportTicketStatus.InReview => Color.Info,
+            _ => Color.Warning
+        };
+    }
+}
