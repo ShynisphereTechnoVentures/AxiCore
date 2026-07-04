@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AxiPlus.Web.Models;
 using AxiPlus.Web.Models.Modules;
@@ -8,14 +7,14 @@ namespace AxiPlus.Web.Services;
 public class LessonApiService
 {
     private readonly HttpClient _httpClient;
-    private readonly AuthService _authService;
+    private readonly AuthorizedApiClient _apiClient;
 
     public LessonApiService(
         HttpClient httpClient,
-        AuthService authService)
+        AuthorizedApiClient apiClient)
    {
         _httpClient = httpClient;
-        _authService = authService;
+        _apiClient = apiClient;
     }
 
     public async Task<List<LessonModel>> GetLessonsByModuleAsync(int moduleId)
@@ -35,70 +34,22 @@ public class LessonApiService
 
     public async Task<LessonDetailsModel?> GetLessonDetailsAsync(Guid lessonId)
    {
-        var request = await CreateAuthorizedRequestAsync(
-            HttpMethod.Get,
+        return await _apiClient.GetAsync<LessonDetailsModel>(
             $"api/lesson/student/me/details/{lessonId}");
-
-        if (request == null)
-       {
-            return null;
-        }
-
-        var response = await _httpClient.SendAsync(request);
-
-        if (!response.IsSuccessStatusCode)
-       {
-            return null;
-        }
-
-        return await response.Content
-            .ReadFromJsonAsync<LessonDetailsModel>()
-            ?? new LessonDetailsModel();
     }
 
     public async Task StartLessonAsync(Guid lessonId)
    {
-        var request = await CreateAuthorizedRequestAsync(
+        await _apiClient.SendAsync(
             HttpMethod.Post,
             $"api/lesson/student/me/start/{lessonId}");
-
-        if (request == null)
-       {
-            return;
-        }
-
-        await _httpClient.SendAsync(request);
     }
 
     public async Task CompleteLessonAsync(Guid lessonId)
    {
-        var request = await CreateAuthorizedRequestAsync(
+        await _apiClient.SendAsync(
             HttpMethod.Post,
             $"api/lesson/student/me/complete/{lessonId}");
-
-        if (request == null)
-       {
-            return;
-        }
-
-        await _httpClient.SendAsync(request);
     }
 
-    private async Task<HttpRequestMessage?> CreateAuthorizedRequestAsync(
-        HttpMethod method,
-        string url)
-   {
-        var token = await _authService.GetTokenAsync();
-
-        if (string.IsNullOrWhiteSpace(token))
-       {
-            return null;
-        }
-
-        var request = new HttpRequestMessage(method, url);
-        request.Headers.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
-
-        return request;
-    }
 }

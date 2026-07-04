@@ -44,6 +44,7 @@ builder.Services.AddScoped(sp =>
 });
 
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AuthorizedApiClient>();
 builder.Services.AddScoped<StudentService>();
 builder.Services.AddScoped<DashboardApiService>();
 

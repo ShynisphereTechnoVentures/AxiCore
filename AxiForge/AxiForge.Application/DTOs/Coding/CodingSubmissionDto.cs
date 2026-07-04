@@ -10,11 +10,21 @@ public sealed class CodingSubmissionDto
 
     public string Language { get; set; } = string.Empty;
 
+    public int LanguageId { get; set; }
+
     public string Status { get; set; } = string.Empty;
 
     public string Output { get; set; } = string.Empty;
 
     public string Error { get; set; } = string.Empty;
+
+    public double RuntimeMilliseconds { get; set; }
+
+    public int MemoryKb { get; set; }
+
+    public string Judge0Tokens { get; set; } = string.Empty;
+
+    public string Judge0RawResult { get; set; } = string.Empty;
 
     public int PassedTests { get; set; }
 

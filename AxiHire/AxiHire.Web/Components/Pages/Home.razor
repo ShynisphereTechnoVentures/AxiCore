@@ -1,0 +1,81 @@
+@page "/"
+@using AxiHire.Application.DTOs
+@using AxiHire.Web.Services
+@inject AxiHireApiClient ApiClient
+
+<PageTitle>AxiHire</PageTitle>
+
+<section class="workspace-header">
+    <div>
+        <p class="eyebrow">Recruiter Verification</p>
+        <h1>Candidate Queue</h1>
+    </div>
+    <button class="icon-button" @onclick="LoadAsync" title="Refresh candidate queue" aria-label="Refresh candidate queue">R</button>
+</section>
+
+<section class="metric-grid">
+    <div class="metric-tile">
+        <span>Candidates</span>
+        <strong>@candidates.Count</strong>
+    </div>
+    <div class="metric-tile">
+        <span>Verified</span>
+        <strong>@VerifiedCount</strong>
+    </div>
+    <div class="metric-tile">
+        <span>Average Score</span>
+        <strong>@AverageScore</strong>
+    </div>
+</section>
+
+@if (isLoading)
+{
+    <div class="empty-state">Loading candidate queue...</div>
+}
+else if (candidates.Count == 0)
+{
+    <div class="empty-state">AxiHire API is unavailable or no candidate snapshots are ready.</div>
+}
+else
+{
+    <section class="candidate-list">
+        @foreach (var candidate in candidates)
+        {
+            <article class="candidate-row">
+                <div>
+                    <h2>@candidate.DisplayName</h2>
+                    <p>@candidate.Headline</p>
+                </div>
+                <div class="candidate-skill">@candidate.PrimarySkill</div>
+                <div class="score-block">
+                    <span>@candidate.VerificationStatus</span>
+                    <strong>@candidate.ReadinessScore</strong>
+                </div>
+            </article>
+        }
+    </section>
+}
+
+@code {
+    private readonly List<CandidateSummaryDto> candidates = new();
+    private bool isLoading = true;
+
+    private int VerifiedCount =>
+        candidates.Count(x => x.VerificationStatus == "Verified");
+
+    private int AverageScore =>
+        candidates.Count == 0 ? 0 : (int)Math.Round(candidates.Average(x => x.ReadinessScore));
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        candidates.Clear();
+        candidates.AddRange(await ApiClient.GetCandidatesAsync());
+        isLoading = false;
+    }
+}

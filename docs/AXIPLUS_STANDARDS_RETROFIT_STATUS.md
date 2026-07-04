@@ -2,6 +2,8 @@
 
 Date: June 27, 2026.
 
+Latest update: July 3, 2026.
+
 ## Goal
 
 Bring AxiPlus into the AxiCore engineering standard before Phase 2 begins.
@@ -90,6 +92,30 @@ Manually retrofitted:
 - `PracticeLaunchService.CreateSignature`
 - `AuthService` public auth functions in Blazor Web
 
+### Blazor Web API Client Services
+
+Covered by:
+
+- `AuthorizedApiClient`
+
+Coverage:
+
+- Shared token-aware request handling.
+- Entering trace.
+- Exiting trace.
+- Exception trace.
+- Consistent JSON deserialization and HTTP failure handling.
+
+Retrofitted:
+
+- `AdminPortalApiService`
+- `MentorPortalApiService`
+- `OperationsApiService`
+- `StudentPortalApiService`
+- `DashboardApiService`
+- `ModuleApiService`
+- `LessonApiService`
+
 ### Concrete API/Startup Services
 
 Manually retrofitted:
@@ -118,12 +144,20 @@ These files are not manually retrofitted unless they gain business behavior:
 - Generated build artifacts.
 - Razor markup-only pages.
 
-## Remaining Before Full Completion
+## Phase Gate Closure
 
-- Manually add XML comments to controller action methods that are covered by filters but do not yet have direct XML comments.
-- Retrofit non-auth Blazor Web API client service methods or convert them to interfaces so they can use `TracingProxy<TService>`.
-- Decide whether to retrofit all Blazor page event handlers individually or keep page behavior covered through API client/service tracing.
-- Add tests for practice launch success and entitlement denial.
+The AxiPlus standards retrofit items that blocked later phases are complete as of July 3, 2026.
+
+| Item | Result |
+| --- | --- |
+| MVC action tracing | Complete through `FunctionTraceActionFilter` |
+| Minimal API endpoint tracing | Complete through `FunctionTraceEndpointFilter` |
+| Interface service tracing | Complete through `TracingProxy<TService>` |
+| Auth and practice launch manual tracing | Complete |
+| Older Blazor Web API client cleanup | Complete through `AuthorizedApiClient` |
+| Database transaction helper standard | Complete |
+
+Future hardening can still expand XML comments and add deeper unit tests, but those are no longer phase blockers for the AxiPlus retrofit.
 
 ## Verification
 
@@ -138,3 +172,6 @@ Result:
 - Build succeeded.
 - 0 warnings.
 - 0 errors.
+- AxiPlus regression script passed.
+- AxiCore shell/API regression script passed.
+- Browser-click QA passed for login, dashboard, modules, lessons, practice, notifications, and support.

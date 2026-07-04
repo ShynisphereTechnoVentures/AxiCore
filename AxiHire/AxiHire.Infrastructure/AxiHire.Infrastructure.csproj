@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\AxiHire.Application\AxiHire.Application.csproj" />
+    <ProjectReference Include="..\AxiHire.Domain\AxiHire.Domain.csproj" />
+    <ProjectReference Include="..\..\AxiCore.Shared\AxiCore.Diagnostics\AxiCore.Diagnostics.csproj" />
+    <ProjectReference Include="..\..\AxiCore.Shared\AxiCore.Persistence\AxiCore.Persistence.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.8" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

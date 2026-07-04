@@ -2,6 +2,8 @@
 
 Date: June 28, 2026
 
+Latest update: July 3, 2026
+
 ## Decision
 
 Phase 1A should be completed before Phase 2 starts. The AxiPlus login/dashboard issue showed that AxiForge must not be built on top of unstable AxiPlus auth, dashboard, seed, or practice-launch behavior.
@@ -18,6 +20,8 @@ Phase 1A should be completed before Phase 2 starts. The AxiPlus login/dashboard 
 - Verified student dashboard, profile, modules, billing, lesson, portal, and practice-launch API flows.
 - Verified AxiPlus Web login and student dashboard pages return successfully.
 - Added repeatable API regression script: `scripts/Invoke-AxiPlusRegression.ps1`.
+- Completed browser-click QA through the Blazor UI for login, dashboard, modules, module detail, lesson detail, practice, notifications, and support.
+- Completed older AxiPlus Web API client cleanup through the shared `AuthorizedApiClient` service.
 
 ## Seed Modes
 
@@ -84,8 +88,8 @@ Validation:
 
 | Page | Result |
 | --- | --- |
-| `http://localhost:5092/login` | Pass |
-| `http://localhost:5092/student/dashboard` | Pass |
+| `http://localhost:5094/login` | Pass |
+| `http://localhost:5094/student/dashboard` | Pass |
 
 ### Automated Regression Script
 
@@ -99,23 +103,43 @@ Result:
 
 - Pass
 
+Latest rerun:
+
+- `dotnet build .\AxiCore.sln`
+- `scripts/Invoke-AxiCoreRegression.ps1`
+- `scripts/Invoke-AxiPlusRegression.ps1`
+
+Result:
+
+- Pass.
+- The missing demo-account regression blocker was fixed by restoring deterministic `Demo` mode seeding at AxiPlus API startup.
+- Verified logins for SuperAdmin, Admin, MainMentor, AssistantMentor, Student, and CollegeCoordinator.
+- Verified student dashboard, profile, modules, billing, lesson, portal, and practice-launch API flows.
+
+Latest browser-click QA:
+
+- Logged in through AxiPlus Web as `child@axiplus.com`.
+- Verified student dashboard after login.
+- Clicked through `My Modules`, `Open Module`, lesson `Open`, `Practice`, `Notifications`, and `Support`.
+- Confirmed expected headings, links, action buttons, and support form fields on each destination.
+
 ## Current Local URLs
 
 - AxiPlus API: `http://localhost:5228`
-- AxiPlus Web: `http://localhost:5092`
+- AxiPlus Web: `http://localhost:5094`
 
-## Remaining Before Phase 1A Final Completion
+## Phase 1A Closure
 
-- Browser-click test login through Blazor UI.
-- Browser-click test student dashboard after login.
-- Browser-click test module, lesson, practice, notifications, and support pages.
-- Finish standards retrofit for older AxiPlus Web service methods that still contain ad hoc console logging.
+The previous Phase 1A blockers are complete as of July 3, 2026.
 
-Browser-click testing note:
-
-- Attempted from Codex, but the local in-app browser tooling failed before connecting to the app.
-- Manual browser verification is still required before marking Phase 1A fully complete.
+| Closure Item | Result |
+| --- | --- |
+| Browser-click login QA | Pass |
+| Browser-click dashboard QA | Pass |
+| Browser-click modules, lessons, practice, notifications, support QA | Pass |
+| Older AxiPlus Web API client cleanup | Complete |
+| Automated AxiPlus regression gate | Pass |
 
 ## Recommendation
 
-Phase 2 can start after the browser-click regression checklist passes, because the clean database, controlled seed, API flows, and web page smoke tests are now stable.
+Phase 1A is closed. The deterministic seed, API flows, browser-click UI path, web smoke checks, standards cleanup, and practice launch flow are green enough for continued product development.

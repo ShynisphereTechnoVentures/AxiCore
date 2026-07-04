@@ -2,9 +2,11 @@
 
 Date: June 28, 2026
 
+Latest update: July 3, 2026
+
 ## Status
 
-Phase 3 coding practice foundation plus the coding IDE upgrade is implemented and smoke-tested.
+Phase 3 coding practice foundation, IDE upgrade, and Judge0 hardening are implemented and smoke-tested.
 
 ## Completed
 
@@ -45,6 +47,10 @@ Phase 3 coding practice foundation plus the coding IDE upgrade is implemented an
 - Added shared launch-token signature validation in AxiForge using `SignedTokens`.
 - Reworked Study Plan page toward the provided Binary Search study-plan reference.
 - Reworked Coding IDE page toward the provided split description/code/test-result reference.
+- Added configurable real Judge0 HTTP client with async submission, token polling, and local fallback mode.
+- Added language ID mapping for C#, JavaScript, Python, Java, and C++.
+- Captured Judge0 submission tokens, runtime, memory, stderr/compile-message failure text, and raw result details.
+- Added schema guards for the new coding submission execution metadata columns.
 
 ## Current Local URLs
 
@@ -73,6 +79,8 @@ Phase 3 coding practice foundation plus the coding IDE upgrade is implemented an
 | AxiPlus practice-launch endpoint auth gate | Pass |
 | Signed AxiPlus child launch-login exchange | Pass |
 | Study Plan reference page render | Pass |
+| Full solution build after Judge0 hardening | Pass |
+| AxiCore shell/API regression script | Pass |
 
 ## Demo Account
 
@@ -92,25 +100,29 @@ Phase 3 coding practice foundation plus the coding IDE upgrade is implemented an
 
 ## Judge0 Status
 
-The current implementation uses `LocalJudge0Client`, a Judge0-compatible local adapter. It validates submissions against stored test case expected outputs so the product flow works immediately.
+Judge0 hardening is complete for the current phase.
 
-Next Judge0 work:
+The implementation now uses `Judge0Client`, a configurable client that can run in either:
 
-- Add real Judge0 HTTP client.
-- Add language ID mapping.
-- Add submission token polling.
-- Add runtime and memory capture.
-- Add compile error and stderr storage.
-- Add timeout/error handling.
-- Add configuration switch between local mode and Judge0 mode.
+- `Judge0:Enabled = true`: submit to the configured Judge0 HTTP endpoint, poll returned tokens, and persist execution metadata.
+- `Judge0:Enabled = false`: use the local Judge0-compatible fallback so local development and regression tests remain deterministic without external credentials.
+
+Captured submission metadata:
+
+- Judge0 language ID.
+- Submission tokens.
+- Runtime milliseconds.
+- Memory KB.
+- Status, stderr, compile output, and error text.
+- Raw Judge0 result payload summary.
 
 ## Database Note
 
 `AxiForgeDb` was reset for this phase because the foundation used `EnsureCreatedAsync` before coding tables existed. Before production hardening, replace `EnsureCreatedAsync` with EF Core migrations.
 
-## Next Phase
+## Ready For Later Product Enhancements
 
-Continue Phase 3 hardening or move into Phase 5 after the real Judge0 client is added:
+Phase 3 is closed. Later product enhancements can build on the completed coding execution foundation:
 
 - Problem admin CRUD.
 - Hidden test cases.

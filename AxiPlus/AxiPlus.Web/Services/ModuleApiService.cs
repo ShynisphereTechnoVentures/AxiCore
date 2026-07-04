@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using AxiPlus.Web.Models;
 using AxiPlus.Web.Models.Modules;
@@ -8,14 +7,14 @@ namespace AxiPlus.Web.Services;
 public class ModuleApiService
 {
     private readonly HttpClient _httpClient;
-    private readonly AuthService _authService;
+    private readonly AuthorizedApiClient _apiClient;
 
     public ModuleApiService(
         HttpClient httpClient,
-        AuthService authService)
+        AuthorizedApiClient apiClient)
    {
         _httpClient = httpClient;
-        _authService = authService;
+        _apiClient = apiClient;
     }
 
     public async Task<List<ModuleModel>> GetModulesAsync()
@@ -28,65 +27,14 @@ public class ModuleApiService
 
     public async Task<List<StudentModuleModel>?> GetStudentModulesAsync()
    {
-        var request = await CreateAuthorizedRequestAsync(
-            HttpMethod.Get,
+        return await _apiClient.GetListAsync<StudentModuleModel>(
             "api/module/student/me");
-
-        if (request == null)
-       {
-            return null;
-        }
-
-        var response = await _httpClient.SendAsync(request);
-
-        if (!response.IsSuccessStatusCode)
-       {
-            return null;
-        }
-
-        return await response.Content
-            .ReadFromJsonAsync<List<StudentModuleModel>>()
-            ?? new List<StudentModuleModel>();
     }
 
     public async Task<ModuleDetailsModel?> GetModuleDetailsAsync(int moduleId)
    {
-        var request = await CreateAuthorizedRequestAsync(
-            HttpMethod.Get,
+        return await _apiClient.GetAsync<ModuleDetailsModel>(
             $"api/module/student/me/details/{moduleId}");
-
-        if (request == null)
-       {
-            return null;
-        }
-
-        var response = await _httpClient.SendAsync(request);
-
-        if (!response.IsSuccessStatusCode)
-       {
-            return null;
-        }
-
-        return await response.Content
-            .ReadFromJsonAsync<ModuleDetailsModel>()
-            ?? new ModuleDetailsModel();
     }
 
-    private async Task<HttpRequestMessage?> CreateAuthorizedRequestAsync(
-        HttpMethod method,
-        string url)
-   {
-        var token = await _authService.GetTokenAsync();
-
-        if (string.IsNullOrWhiteSpace(token))
-       {
-            return null;
-        }
-
-        var request = new HttpRequestMessage(method, url);
-        request.Headers.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
-
-        return request;
-    }
 }

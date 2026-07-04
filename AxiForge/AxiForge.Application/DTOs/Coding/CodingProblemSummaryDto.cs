@@ -13,4 +13,8 @@ public class CodingProblemSummaryDto
     public string Topic { get; set; } = string.Empty;
 
     public string Tags { get; set; } = string.Empty;
+
+    public string ClassTags { get; set; } = string.Empty;
+
+    public string CompanyTags { get; set; } = string.Empty;
 }

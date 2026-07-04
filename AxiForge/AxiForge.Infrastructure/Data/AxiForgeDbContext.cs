@@ -32,6 +32,10 @@ public sealed class AxiForgeDbContext : DbContext
 
     public DbSet<AssessmentAnswer> AssessmentAnswers => Set<AssessmentAnswer>();
 
+    public DbSet<AxiForgeAdminAuditEntry> AdminAuditEntries => Set<AxiForgeAdminAuditEntry>();
+
+    public DbSet<AxiForgeTaxonomyItem> TaxonomyItems => Set<AxiForgeTaxonomyItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<CodingProblem>(entity =>
@@ -43,6 +47,10 @@ public sealed class AxiForgeDbContext : DbContext
             entity.Property(x => x.Difficulty).HasMaxLength(40).IsRequired();
             entity.Property(x => x.Topic).HasMaxLength(120).IsRequired();
             entity.Property(x => x.Tags).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.ClassTags).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.CompanyTags).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.ApprovalStatus).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.ApprovedBy).HasMaxLength(256).IsRequired();
             entity.Property(x => x.TimeLimitMilliseconds).HasDefaultValue(1000);
             entity.Property(x => x.MemoryLimitKb).HasDefaultValue(262144);
             entity.HasMany(x => x.TestCases)
@@ -60,6 +68,8 @@ public sealed class AxiForgeDbContext : DbContext
         {
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Language).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Judge0Tokens).IsRequired();
+            entity.Property(x => x.Judge0RawResult).IsRequired();
             entity.Property(x => x.Status).HasMaxLength(80).IsRequired();
             entity.HasIndex(x => x.AccountId);
             entity.HasOne(x => x.Problem)
@@ -86,6 +96,10 @@ public sealed class AxiForgeDbContext : DbContext
             entity.Property(x => x.Slug).HasMaxLength(140).IsRequired();
             entity.Property(x => x.Title).HasMaxLength(180).IsRequired();
             entity.Property(x => x.Level).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.ClassTags).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.CompanyTags).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.ApprovalStatus).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.ApprovedBy).HasMaxLength(256).IsRequired();
             entity.HasMany(x => x.Steps)
                 .WithOne(x => x.RoadmapTemplate)
                 .HasForeignKey(x => x.RoadmapTemplateId)
@@ -114,6 +128,10 @@ public sealed class AxiForgeDbContext : DbContext
             entity.HasIndex(x => x.Slug).IsUnique();
             entity.Property(x => x.Slug).HasMaxLength(140).IsRequired();
             entity.Property(x => x.Title).HasMaxLength(180).IsRequired();
+            entity.Property(x => x.ClassTags).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.CompanyTags).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.ApprovalStatus).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.ApprovedBy).HasMaxLength(256).IsRequired();
             entity.HasMany(x => x.Questions)
                 .WithOne(x => x.AssessmentTemplate)
                 .HasForeignKey(x => x.AssessmentTemplateId)
@@ -149,6 +167,25 @@ public sealed class AxiForgeDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.AssessmentQuestionId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AxiForgeAdminAuditEntry>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.EntityType, x.EntityId });
+            entity.Property(x => x.EntityType).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Action).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.Summary).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.ActorEmail).HasMaxLength(256).IsRequired();
+        });
+
+        modelBuilder.Entity<AxiForgeTaxonomyItem>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.Type, x.Slug }).IsUnique();
+            entity.Property(x => x.Type).HasMaxLength(40).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.Slug).HasMaxLength(180).IsRequired();
         });
     }
 }

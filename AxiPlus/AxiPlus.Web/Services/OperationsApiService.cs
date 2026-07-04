@@ -7,13 +7,11 @@ namespace AxiPlus.Web.Services;
 
 public class OperationsApiService
 {
-    private readonly HttpClient _httpClient;
-    private readonly AuthService _authService;
+    private readonly AuthorizedApiClient _apiClient;
 
-    public OperationsApiService(HttpClient httpClient, AuthService authService)
+    public OperationsApiService(AuthorizedApiClient apiClient)
    {
-        _httpClient = httpClient;
-        _authService = authService;
+        _apiClient = apiClient;
     }
 
     public Task<MentorProfileModel?> GetMentorProfileAsync()
@@ -100,78 +98,16 @@ public class OperationsApiService
 
     private async Task<List<T>> GetListAsync<T>(string url)
    {
-        var result = await GetAsync<List<T>>(url);
-
-        return result ?? new List<T>();
+        return await _apiClient.GetListAsync<T>(url);
     }
 
-    private async Task<T?> GetAsync<T>(string url)
+    private Task<T?> GetAsync<T>(string url)
    {
-        var request = await CreateRequestAsync(HttpMethod.Get, url);
-
-        return request == null ? default : await SendAsync<T>(request);
+        return _apiClient.GetAsync<T>(url);
     }
 
-    private async Task<T?> PostAsync<T>(string url, object body)
+    private Task<T?> PostAsync<T>(string url, object body)
    {
-        var request = await CreateRequestAsync(HttpMethod.Post, url);
-
-        if (request == null)
-       {
-            return default;
-        }
-
-        request.Content = JsonContent.Create(body);
-
-        return await SendAsync<T>(request);
-    }
-
-    private async Task<T?> SendAsync<T>(HttpRequestMessage request)
-   {
-        try
-       {
-            var response = await _httpClient.SendAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-           {
-                return default;
-            }
-
-            return await response.Content.ReadFromJsonAsync<T>();
-        }
-        catch (HttpRequestException)
-       {
-            return default;
-        }
-        catch (TaskCanceledException)
-       {
-            return default;
-        }
-        catch (NotSupportedException)
-       {
-            return default;
-        }
-        catch (JsonException)
-       {
-            return default;
-        }
-    }
-
-    private async Task<HttpRequestMessage?> CreateRequestAsync(
-        HttpMethod method,
-        string url)
-   {
-        var token = await _authService.GetTokenAsync();
-
-        if (string.IsNullOrWhiteSpace(token))
-       {
-            return null;
-        }
-
-        var request = new HttpRequestMessage(method, url);
-        request.Headers.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
-
-        return request;
+        return _apiClient.PostAsync<T>(url, body);
     }
 }

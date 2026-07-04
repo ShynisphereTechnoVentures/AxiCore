@@ -8,15 +8,11 @@ namespace AxiPlus.Web.Services;
 
 public class AdminPortalApiService
 {
-    private readonly HttpClient _httpClient;
-    private readonly AuthService _authService;
+    private readonly AuthorizedApiClient _apiClient;
 
-    public AdminPortalApiService(
-        HttpClient httpClient,
-        AuthService authService)
+    public AdminPortalApiService(AuthorizedApiClient apiClient)
    {
-        _httpClient = httpClient;
-        _authService = authService;
+        _apiClient = apiClient;
     }
 
     public Task<AdminDashboardModel?> GetDashboardAsync()
@@ -152,6 +148,23 @@ public class AdminPortalApiService
         return SendAsync(HttpMethod.Post, $"api/admin-portal/axiforge/problems/{id}/archive");
     }
 
+    public Task<bool> SubmitAxiForgeProblemForApprovalAsync(Guid id)
+   {
+        return SendAsync(HttpMethod.Post, $"api/admin-portal/axiforge/problems/{id}/submit-approval");
+    }
+
+    public Task<bool> ApproveAxiForgeProblemAsync(Guid id)
+   {
+        return SendAsync(HttpMethod.Post, $"api/admin-portal/axiforge/problems/{id}/approve");
+    }
+
+    public Task<bool> RejectAxiForgeProblemAsync(Guid id, string reason)
+   {
+        return PostNoContentAsync(
+            $"api/admin-portal/axiforge/problems/{id}/reject",
+            new AxiForgeApprovalActionModel { Reason = reason });
+    }
+
     public Task<bool> DeleteAxiForgeProblemAsync(Guid id)
    {
         return SendAsync(HttpMethod.Delete, $"api/admin-portal/axiforge/problems/{id}");
@@ -176,6 +189,23 @@ public class AdminPortalApiService
         return SendAsync(HttpMethod.Post, $"api/admin-portal/axiforge/roadmaps/{id}/archive");
     }
 
+    public Task<bool> SubmitAxiForgeRoadmapForApprovalAsync(Guid id)
+   {
+        return SendAsync(HttpMethod.Post, $"api/admin-portal/axiforge/roadmaps/{id}/submit-approval");
+    }
+
+    public Task<bool> ApproveAxiForgeRoadmapAsync(Guid id)
+   {
+        return SendAsync(HttpMethod.Post, $"api/admin-portal/axiforge/roadmaps/{id}/approve");
+    }
+
+    public Task<bool> RejectAxiForgeRoadmapAsync(Guid id, string reason)
+   {
+        return PostNoContentAsync(
+            $"api/admin-portal/axiforge/roadmaps/{id}/reject",
+            new AxiForgeApprovalActionModel { Reason = reason });
+    }
+
     public Task<bool> DeleteAxiForgeRoadmapAsync(Guid id)
    {
         return SendAsync(HttpMethod.Delete, $"api/admin-portal/axiforge/roadmaps/{id}");
@@ -198,6 +228,23 @@ public class AdminPortalApiService
     public Task<bool> ArchiveAxiForgeAssessmentAsync(Guid id)
    {
         return SendAsync(HttpMethod.Post, $"api/admin-portal/axiforge/assessments/{id}/archive");
+    }
+
+    public Task<bool> SubmitAxiForgeAssessmentForApprovalAsync(Guid id)
+   {
+        return SendAsync(HttpMethod.Post, $"api/admin-portal/axiforge/assessments/{id}/submit-approval");
+    }
+
+    public Task<bool> ApproveAxiForgeAssessmentAsync(Guid id)
+   {
+        return SendAsync(HttpMethod.Post, $"api/admin-portal/axiforge/assessments/{id}/approve");
+    }
+
+    public Task<bool> RejectAxiForgeAssessmentAsync(Guid id, string reason)
+   {
+        return PostNoContentAsync(
+            $"api/admin-portal/axiforge/assessments/{id}/reject",
+            new AxiForgeApprovalActionModel { Reason = reason });
     }
 
     public Task<bool> DeleteAxiForgeAssessmentAsync(Guid id)
@@ -241,156 +288,48 @@ public class AdminPortalApiService
         return PostNoContentAsync("api/admin-portal/axiforge/import", model);
     }
 
+    public Task<List<AxiForgeAdminAuditEntryModel>> GetAxiForgeAuditAsync()
+   {
+        return GetListAsync<AxiForgeAdminAuditEntryModel>(
+            "api/admin-portal/axiforge/audit");
+    }
+
+    public Task<List<AxiForgeTaxonomyItemModel>> GetAxiForgeTaxonomyAsync()
+   {
+        return GetListAsync<AxiForgeTaxonomyItemModel>(
+            "api/admin-portal/axiforge/taxonomy");
+    }
+
+    public Task<AxiForgeTaxonomyItemModel?> SaveAxiForgeTaxonomyAsync(
+        SaveAxiForgeTaxonomyItemModel model)
+   {
+        return PostAsync<AxiForgeTaxonomyItemModel>(
+            "api/admin-portal/axiforge/taxonomy",
+            model);
+    }
+
     private async Task<List<T>> GetListAsync<T>(string url)
    {
-        var result = await GetAsync<List<T>>(url);
-
-        return result ?? new List<T>();
+        return await _apiClient.GetListAsync<T>(url);
     }
 
-    private async Task<T?> GetAsync<T>(string url)
+    private Task<T?> GetAsync<T>(string url)
    {
-        var request = await CreateAuthorizedRequestAsync(HttpMethod.Get, url);
-
-        if (request == null)
-       {
-            return default;
-        }
-
-        try
-       {
-            var response = await _httpClient.SendAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-           {
-                return default;
-            }
-
-            return await response.Content.ReadFromJsonAsync<T>();
-        }
-        catch (HttpRequestException)
-       {
-            return default;
-        }
-        catch (TaskCanceledException)
-       {
-            return default;
-        }
-        catch (NotSupportedException)
-       {
-            return default;
-        }
-        catch (JsonException)
-       {
-            return default;
-        }
+        return _apiClient.GetAsync<T>(url);
     }
 
-    private async Task<T?> PostAsync<T>(string url, object body)
+    private Task<T?> PostAsync<T>(string url, object body)
    {
-        var request = await CreateAuthorizedRequestAsync(HttpMethod.Post, url);
-
-        if (request == null)
-       {
-            return default;
-        }
-
-        request.Content = JsonContent.Create(body);
-
-        try
-       {
-            var response = await _httpClient.SendAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-           {
-                return default;
-            }
-
-            return await response.Content.ReadFromJsonAsync<T>();
-        }
-        catch (HttpRequestException)
-       {
-            return default;
-        }
-        catch (TaskCanceledException)
-       {
-            return default;
-        }
-        catch (NotSupportedException)
-       {
-            return default;
-        }
-        catch (JsonException)
-       {
-            return default;
-        }
+        return _apiClient.PostAsync<T>(url, body);
     }
 
-    private async Task<bool> PostNoContentAsync(string url, object body)
+    private Task<bool> PostNoContentAsync(string url, object body)
    {
-        var request = await CreateAuthorizedRequestAsync(HttpMethod.Post, url);
-
-        if (request == null)
-       {
-            return false;
-        }
-
-        request.Content = JsonContent.Create(body);
-
-        try
-       {
-            var response = await _httpClient.SendAsync(request);
-            return response.IsSuccessStatusCode;
-        }
-        catch (HttpRequestException)
-       {
-            return false;
-        }
-        catch (TaskCanceledException)
-       {
-            return false;
-        }
+        return _apiClient.SendAsync(HttpMethod.Post, url, body);
     }
 
-    private async Task<bool> SendAsync(HttpMethod method, string url)
+    private Task<bool> SendAsync(HttpMethod method, string url)
    {
-        var request = await CreateAuthorizedRequestAsync(method, url);
-
-        if (request == null)
-       {
-            return false;
-        }
-
-        try
-       {
-            var response = await _httpClient.SendAsync(request);
-            return response.IsSuccessStatusCode;
-        }
-        catch (HttpRequestException)
-       {
-            return false;
-        }
-        catch (TaskCanceledException)
-       {
-            return false;
-        }
-    }
-
-    private async Task<HttpRequestMessage?> CreateAuthorizedRequestAsync(
-        HttpMethod method,
-        string url)
-   {
-        var token = await _authService.GetTokenAsync();
-
-        if (string.IsNullOrWhiteSpace(token))
-       {
-            return null;
-        }
-
-        var request = new HttpRequestMessage(method, url);
-        request.Headers.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
-
-        return request;
+        return _apiClient.SendAsync(method, url);
     }
 }

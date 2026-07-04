@@ -8,14 +8,16 @@ AxiCore is the shared Axionora engineering workspace for:
 
 ## Current Phase
 
-Phase 0 - Workspace Stabilization.
+AxiHire foundation has started after the AxiPlus/AxiForge automated regression gate was restored.
 
 Current status:
 
 - Existing AxiPlus solution is included.
 - Root `AxiCore.sln` is created.
 - Shared library skeleton is created under `AxiCore.Shared`.
-- PostgreSQL is planned as four databases: `AxiCoreDb`, `AxiPlusDb`, `AxiForgeDb`, and `AxiHireDb`.
+- AxiPlus and AxiForge automated regression checks are green.
+- AxiHire foundation projects, API, database context, and web shell are included.
+- PostgreSQL uses four databases: `AxiCoreDb`, `AxiPlusDb`, `AxiForgeDb`, and `AxiHireDb`.
 
 ## Build
 
@@ -46,6 +48,8 @@ AxiCore.Shared/
   AxiCore.Persistence/
   AxiCore.Infrastructure/
 AxiPlus/
+AxiForge/
+AxiHire/
 docs/
 docker/
 ```
@@ -65,3 +69,4 @@ docker/
 - [Phase 4A/4B/4C AxiForge Dynamic Admin Auth Plan](docs/PHASE_4A_4B_4C_AXIFORGE_DYNAMIC_ADMIN_AUTH_PLAN.md)
 - [Pre-Phase 4A AxiCore Shared Data Migration Status](docs/PRE_PHASE_4A_AXICORE_SHARED_DATA_MIGRATION_STATUS.md)
 - [AxiPlus Standards Retrofit Status](docs/AXIPLUS_STANDARDS_RETROFIT_STATUS.md)
+- [Phase 8 AxiHire Foundation Status](docs/PHASE_8_AXIHIRE_FOUNDATION_STATUS.md)

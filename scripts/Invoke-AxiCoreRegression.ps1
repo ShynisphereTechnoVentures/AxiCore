@@ -58,6 +58,51 @@ function Assert-HttpSuccess {
     }
 }
 
+function Assert-HttpStatus {
+    param(
+        [string]$Name,
+        [string]$Url,
+        [int]$ExpectedStatusCode,
+        [string]$Method = "GET",
+        [object]$Body = $null
+    )
+
+    Write-Host "Entering -> AxiCore -> scripts -> Invoke-AxiCoreRegression.ps1 -> Assert-HttpStatus"
+    try {
+        $parameters = @{
+            Uri = $Url
+            Method = $Method
+            UseBasicParsing = $true
+        }
+
+        if ($null -ne $Body) {
+            $parameters.ContentType = "application/json"
+            $parameters.Body = ($Body | ConvertTo-Json -Depth 12)
+        }
+
+        $statusCode = $null
+        try {
+            $response = Invoke-WebRequest @parameters
+            $statusCode = [int]$response.StatusCode
+        }
+        catch {
+            if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+                $statusCode = [int]$_.Exception.Response.StatusCode
+            }
+            else {
+                throw
+            }
+        }
+
+        if ($statusCode -ne $ExpectedStatusCode) {
+            throw "$Name returned HTTP $statusCode; expected HTTP $ExpectedStatusCode"
+        }
+    }
+    finally {
+        Write-Host "Exiting -> AxiCore -> scripts -> Invoke-AxiCoreRegression.ps1 -> Assert-HttpStatus"
+    }
+}
+
 Invoke-RegressionCheck "AxiForge API health" {
     Assert-HttpSuccess "AxiForge API health" "$AxiForgeApi/api/health"
 }
@@ -84,6 +129,14 @@ Invoke-RegressionCheck "AxiForge assessments API" {
 
 Invoke-RegressionCheck "AxiForge password reset request" {
     Assert-HttpSuccess "AxiForge password reset request" "$AxiForgeApi/api/auth/request-password-reset" "POST" @{ email = "regression.student@example.com" }
+}
+
+Invoke-RegressionCheck "AxiForge resend email confirmation" {
+    Assert-HttpSuccess "AxiForge resend email confirmation" "$AxiForgeApi/api/auth/resend-confirmation" "POST" @{ email = "regression.student@example.com" }
+}
+
+Invoke-RegressionCheck "AxiForge invalid email confirmation token rejection" {
+    Assert-HttpStatus "AxiForge invalid email confirmation token rejection" "$AxiForgeApi/api/auth/confirm-email" 400 "POST" @{ token = "invalid-token" }
 }
 
 Invoke-RegressionCheck "AxiPlus login page" {

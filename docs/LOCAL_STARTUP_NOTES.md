@@ -6,6 +6,13 @@ Date: June 29, 2026
 
 - AxiForge.Web: `http://localhost:5242`
 - AxiPlus.Web: `http://localhost:5094`
+- AxiHire.Web: `http://localhost:5267`
+
+## Current API URLs
+
+- AxiForge.API: `http://localhost:5055`
+- AxiPlus.API: `http://localhost:5228`
+- AxiHire.API: `http://localhost:5067`
 
 ## What Happened
 
@@ -47,6 +54,30 @@ Open:
 http://localhost:5094/login
 ```
 
+Start AxiHire API:
+
+```powershell
+dotnet run --project AxiHire\AxiHire.API\AxiHire.API.csproj --no-build
+```
+
+Open:
+
+```text
+http://localhost:5067/api/health
+```
+
+Start AxiHire Web:
+
+```powershell
+dotnet run --project AxiHire\AxiHire.Web\AxiHire.Web.csproj --no-build
+```
+
+Open:
+
+```text
+http://localhost:5267/
+```
+
 ## If A Port Is Already In Use
 
 Find the process:
@@ -54,6 +85,7 @@ Find the process:
 ```powershell
 netstat -ano | Select-String ':5242'
 netstat -ano | Select-String ':5094'
+netstat -ano | Select-String ':5267'
 ```
 
 Stop a specific process:

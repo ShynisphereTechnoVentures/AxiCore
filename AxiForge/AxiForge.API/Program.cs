@@ -133,6 +133,54 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE "CodingProblems" ADD COLUMN IF NOT EXISTS "StarterCodeByLanguage" text NOT NULL DEFAULT '';
             ALTER TABLE "CodingProblems" ADD COLUMN IF NOT EXISTS "TimeLimitMilliseconds" integer NOT NULL DEFAULT 1000;
             ALTER TABLE "CodingProblems" ADD COLUMN IF NOT EXISTS "MemoryLimitKb" integer NOT NULL DEFAULT 262144;
+            ALTER TABLE "CodingProblems" ADD COLUMN IF NOT EXISTS "ClassTags" character varying(500) NOT NULL DEFAULT '';
+            ALTER TABLE "CodingProblems" ADD COLUMN IF NOT EXISTS "CompanyTags" character varying(500) NOT NULL DEFAULT '';
+            ALTER TABLE "CodingProblems" ADD COLUMN IF NOT EXISTS "ApprovalStatus" character varying(80) NOT NULL DEFAULT 'Approved';
+            ALTER TABLE "CodingProblems" ADD COLUMN IF NOT EXISTS "SubmittedForApprovalAt" timestamp with time zone NULL;
+            ALTER TABLE "CodingProblems" ADD COLUMN IF NOT EXISTS "ApprovedAt" timestamp with time zone NULL;
+            ALTER TABLE "CodingProblems" ADD COLUMN IF NOT EXISTS "ApprovedBy" character varying(256) NOT NULL DEFAULT '';
+            ALTER TABLE "CodingProblems" ADD COLUMN IF NOT EXISTS "RejectionReason" text NOT NULL DEFAULT '';
+            ALTER TABLE "CodingSubmissions" ADD COLUMN IF NOT EXISTS "LanguageId" integer NOT NULL DEFAULT 0;
+            ALTER TABLE "CodingSubmissions" ADD COLUMN IF NOT EXISTS "RuntimeMilliseconds" double precision NOT NULL DEFAULT 0;
+            ALTER TABLE "CodingSubmissions" ADD COLUMN IF NOT EXISTS "MemoryKb" integer NOT NULL DEFAULT 0;
+            ALTER TABLE "CodingSubmissions" ADD COLUMN IF NOT EXISTS "Judge0Tokens" text NOT NULL DEFAULT '';
+            ALTER TABLE "CodingSubmissions" ADD COLUMN IF NOT EXISTS "Judge0RawResult" text NOT NULL DEFAULT '';
+            ALTER TABLE "RoadmapTemplates" ADD COLUMN IF NOT EXISTS "ClassTags" character varying(500) NOT NULL DEFAULT '';
+            ALTER TABLE "RoadmapTemplates" ADD COLUMN IF NOT EXISTS "CompanyTags" character varying(500) NOT NULL DEFAULT '';
+            ALTER TABLE "RoadmapTemplates" ADD COLUMN IF NOT EXISTS "ApprovalStatus" character varying(80) NOT NULL DEFAULT 'Approved';
+            ALTER TABLE "RoadmapTemplates" ADD COLUMN IF NOT EXISTS "SubmittedForApprovalAt" timestamp with time zone NULL;
+            ALTER TABLE "RoadmapTemplates" ADD COLUMN IF NOT EXISTS "ApprovedAt" timestamp with time zone NULL;
+            ALTER TABLE "RoadmapTemplates" ADD COLUMN IF NOT EXISTS "ApprovedBy" character varying(256) NOT NULL DEFAULT '';
+            ALTER TABLE "RoadmapTemplates" ADD COLUMN IF NOT EXISTS "RejectionReason" text NOT NULL DEFAULT '';
+            ALTER TABLE "AssessmentTemplates" ADD COLUMN IF NOT EXISTS "ClassTags" character varying(500) NOT NULL DEFAULT '';
+            ALTER TABLE "AssessmentTemplates" ADD COLUMN IF NOT EXISTS "CompanyTags" character varying(500) NOT NULL DEFAULT '';
+            ALTER TABLE "AssessmentTemplates" ADD COLUMN IF NOT EXISTS "ApprovalStatus" character varying(80) NOT NULL DEFAULT 'Approved';
+            ALTER TABLE "AssessmentTemplates" ADD COLUMN IF NOT EXISTS "SubmittedForApprovalAt" timestamp with time zone NULL;
+            ALTER TABLE "AssessmentTemplates" ADD COLUMN IF NOT EXISTS "ApprovedAt" timestamp with time zone NULL;
+            ALTER TABLE "AssessmentTemplates" ADD COLUMN IF NOT EXISTS "ApprovedBy" character varying(256) NOT NULL DEFAULT '';
+            ALTER TABLE "AssessmentTemplates" ADD COLUMN IF NOT EXISTS "RejectionReason" text NOT NULL DEFAULT '';
+            CREATE TABLE IF NOT EXISTS "AdminAuditEntries" (
+                "Id" uuid NOT NULL,
+                "EntityType" character varying(80) NOT NULL,
+                "EntityId" uuid NULL,
+                "Action" character varying(80) NOT NULL,
+                "Summary" character varying(500) NOT NULL,
+                "ActorEmail" character varying(256) NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                CONSTRAINT "PK_AdminAuditEntries" PRIMARY KEY ("Id")
+            );
+            CREATE TABLE IF NOT EXISTS "TaxonomyItems" (
+                "Id" uuid NOT NULL,
+                "Type" character varying(40) NOT NULL,
+                "Name" character varying(160) NOT NULL,
+                "Slug" character varying(180) NOT NULL,
+                "IsActive" boolean NOT NULL,
+                "DisplayOrder" integer NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                CONSTRAINT "PK_TaxonomyItems" PRIMARY KEY ("Id")
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_TaxonomyItems_Type_Slug" ON "TaxonomyItems" ("Type", "Slug");
+            CREATE INDEX IF NOT EXISTS "IX_AdminAuditEntries_EntityType_EntityId" ON "AdminAuditEntries" ("EntityType", "EntityId");
             """);
     }
 }
@@ -218,6 +266,40 @@ app.MapPost("/api/auth/request-password-reset", async (
     }
 
     var accepted = await authService.RequestPasswordResetAsync(request, cancellationToken);
+    return accepted ? Results.Accepted() : Results.BadRequest();
+});
+
+app.MapPost("/api/auth/confirm-email", async (
+    ConfirmEmailRequestDto request,
+    IAuthService authService,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Token))
+    {
+        return Results.BadRequest(new
+        {
+            message = "Confirmation token is required."
+        });
+    }
+
+    var confirmed = await authService.ConfirmEmailAsync(request, cancellationToken);
+    return confirmed ? Results.Ok(new { confirmed = true }) : Results.BadRequest(new { confirmed = false });
+});
+
+app.MapPost("/api/auth/resend-confirmation", async (
+    ResendEmailConfirmationRequestDto request,
+    IAuthService authService,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Email))
+    {
+        return Results.BadRequest(new
+        {
+            message = "Email is required."
+        });
+    }
+
+    var accepted = await authService.ResendEmailConfirmationAsync(request, cancellationToken);
     return accepted ? Results.Accepted() : Results.BadRequest();
 });
 

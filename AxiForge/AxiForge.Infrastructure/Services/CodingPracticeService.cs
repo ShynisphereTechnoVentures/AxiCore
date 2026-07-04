@@ -70,7 +70,9 @@ public sealed class CodingPracticeService : ICodingPracticeService
                     Title = x.Title,
                     Difficulty = x.Difficulty,
                     Topic = x.Topic,
-                    Tags = x.Tags
+                    Tags = x.Tags,
+                    ClassTags = x.ClassTags,
+                    CompanyTags = x.CompanyTags
                 })
                 .ToListAsync(cancellationToken);
         }
@@ -136,10 +138,15 @@ public sealed class CodingPracticeService : ICodingPracticeService
                 AccountId = accountId,
                 ProblemId = problem.Id,
                 Language = request.Language,
+                LanguageId = result.LanguageId,
                 SourceCode = request.SourceCode,
                 Status = result.Status,
                 Output = result.Output,
                 Error = result.Error,
+                RuntimeMilliseconds = result.RuntimeMilliseconds,
+                MemoryKb = result.MemoryKb,
+                Judge0Tokens = result.Judge0Tokens,
+                Judge0RawResult = result.Judge0RawResult,
                 PassedTests = result.PassedTests,
                 TotalTests = result.TotalTests,
                 SubmittedAt = DateTime.UtcNow
@@ -179,9 +186,12 @@ public sealed class CodingPracticeService : ICodingPracticeService
                     ProblemId = x.ProblemId,
                     ProblemTitle = x.Problem.Title,
                     Language = x.Language,
+                    LanguageId = x.LanguageId,
                     Status = x.Status,
                     Output = x.Output,
                     Error = x.Error,
+                    RuntimeMilliseconds = x.RuntimeMilliseconds,
+                    MemoryKb = x.MemoryKb,
                     PassedTests = x.PassedTests,
                     TotalTests = x.TotalTests,
                     SubmittedAt = x.SubmittedAt
@@ -212,6 +222,8 @@ public sealed class CodingPracticeService : ICodingPracticeService
                 Difficulty = problem.Difficulty,
                 Topic = problem.Topic,
                 Tags = problem.Tags,
+                ClassTags = problem.ClassTags,
+                CompanyTags = problem.CompanyTags,
                 Description = problem.Description,
                 InputFormat = problem.InputFormat,
                 OutputFormat = problem.OutputFormat,
@@ -301,9 +313,14 @@ public sealed class CodingPracticeService : ICodingPracticeService
                 ProblemId = submission.ProblemId,
                 ProblemTitle = problemTitle,
                 Language = submission.Language,
+                LanguageId = submission.LanguageId,
                 Status = submission.Status,
                 Output = submission.Output,
                 Error = submission.Error,
+                RuntimeMilliseconds = submission.RuntimeMilliseconds,
+                MemoryKb = submission.MemoryKb,
+                Judge0Tokens = submission.Judge0Tokens,
+                Judge0RawResult = submission.Judge0RawResult,
                 PassedTests = submission.PassedTests,
                 TotalTests = submission.TotalTests,
                 SubmittedAt = submission.SubmittedAt

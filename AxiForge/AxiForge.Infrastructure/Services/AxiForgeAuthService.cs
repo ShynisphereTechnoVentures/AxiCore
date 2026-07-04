@@ -18,17 +18,20 @@ public sealed class AxiForgeAuthService : IAuthService
     private readonly AxiCoreDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly ILaunchTokenService _launchTokenService;
+    private readonly IEmailDeliveryService _emailDeliveryService;
     private readonly ILogger<AxiForgeAuthService> _logger;
 
     public AxiForgeAuthService(
         AxiCoreDbContext context,
         IConfiguration configuration,
         ILaunchTokenService launchTokenService,
+        IEmailDeliveryService emailDeliveryService,
         ILogger<AxiForgeAuthService> logger)
     {
         _context = context;
         _configuration = configuration;
         _launchTokenService = launchTokenService;
+        _emailDeliveryService = emailDeliveryService;
         _logger = logger;
     }
 
@@ -107,7 +110,7 @@ public sealed class AxiForgeAuthService : IAuthService
             await EnsureRoleAsync(account.Id, AxiCoreRoleNames.Student, cancellationToken);
             EnsureProductAccess(account.Id, AxiCoreProductCodes.AxiForge);
             await _context.SaveChangesAsync(cancellationToken);
-            WriteEmailConfirmationMessage(account);
+            await SendEmailConfirmationAsync(account, cancellationToken);
 
             return CreateResponse(account);
         }
@@ -189,7 +192,81 @@ public sealed class AxiForgeAuthService : IAuthService
             if (account != null)
             {
                 var token = CreatePurposeToken(account, "password-reset", TimeSpan.FromMinutes(30));
-                Console.WriteLine($"EMAIL -> AxiForge -> PasswordReset -> To:{account.Email} -> ResetLink:/reset-password?token={Uri.EscapeDataString(token)}");
+                await _emailDeliveryService.SendPasswordResetAsync(
+                    account.Email,
+                    account.FullName,
+                    BuildAppLink("/reset-password", token),
+                    cancellationToken);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            trace.Exception(ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Confirms an AxiForge email address using a signed short-lived token.
+    /// Returns true when the token is valid and the account is marked confirmed.
+    /// </summary>
+    public async Task<bool> ConfirmEmailAsync(
+        ConfirmEmailRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        using var trace = FunctionTrace.Enter(_logger, nameof(AxiForgeAuthService), nameof(ConfirmEmailAsync));
+        try
+        {
+            var userId = ValidatePurposeToken(request.Token, "email-confirmation");
+            if (userId == null)
+            {
+                return false;
+            }
+
+            var account = await _context.Users
+                .FirstOrDefaultAsync(x => x.Id == userId.Value && x.IsActive, cancellationToken);
+
+            if (account == null)
+            {
+                return false;
+            }
+
+            account.EmailConfirmed = true;
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            trace.Exception(ex);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Resends the email-confirmation message for an active account.
+    /// Returns true even when no account exists so registered addresses are not disclosed.
+    /// </summary>
+    public async Task<bool> ResendEmailConfirmationAsync(
+        ResendEmailConfirmationRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        using var trace = FunctionTrace.Enter(_logger, nameof(AxiForgeAuthService), nameof(ResendEmailConfirmationAsync));
+        try
+        {
+            var email = request.Email.Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return false;
+            }
+
+            var account = await _context.Users
+                .FirstOrDefaultAsync(x => x.Email == email && x.IsActive, cancellationToken);
+
+            if (account != null && !account.EmailConfirmed)
+            {
+                await SendEmailConfirmationAsync(account, cancellationToken);
             }
 
             return true;
@@ -215,7 +292,8 @@ public sealed class AxiForgeAuthService : IAuthService
                 Token = CreateToken(account),
                 Email = account.Email,
                 FullName = account.FullName,
-                Role = AxiCoreRoleNames.Student
+                Role = AxiCoreRoleNames.Student,
+                EmailConfirmed = account.EmailConfirmed
             };
         }
         catch (Exception ex)
@@ -301,18 +379,70 @@ public sealed class AxiForgeAuthService : IAuthService
     /// Writes the email-confirmation message to the shared console stream.
     /// Returns no value because SMTP delivery is configured outside the current development environment.
     /// </summary>
-    private void WriteEmailConfirmationMessage(AxiCoreUser account)
+    private async Task SendEmailConfirmationAsync(
+        AxiCoreUser account,
+        CancellationToken cancellationToken)
     {
-        using var trace = FunctionTrace.Enter(_logger, nameof(AxiForgeAuthService), nameof(WriteEmailConfirmationMessage));
+        using var trace = FunctionTrace.Enter(_logger, nameof(AxiForgeAuthService), nameof(SendEmailConfirmationAsync));
         try
         {
             var token = CreatePurposeToken(account, "email-confirmation", TimeSpan.FromDays(2));
-            Console.WriteLine($"EMAIL -> AxiForge -> ConfirmEmail -> To:{account.Email} -> ConfirmLink:/confirm-email?token={Uri.EscapeDataString(token)}");
+            await _emailDeliveryService.SendEmailConfirmationAsync(
+                account.Email,
+                account.FullName,
+                BuildAppLink("/confirm-email", token),
+                cancellationToken);
         }
         catch (Exception ex)
         {
             trace.Exception(ex);
             throw;
+        }
+    }
+
+    private string BuildAppLink(string path, string token)
+    {
+        var baseUrl = _configuration["EmailDelivery:AppBaseUrl"] ?? "http://localhost:5242";
+        return $"{baseUrl.TrimEnd('/')}{path}?token={Uri.EscapeDataString(token)}";
+    }
+
+    private Guid? ValidatePurposeToken(string token, string expectedPurpose)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
+        try
+        {
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
+            var handler = new JwtSecurityTokenHandler();
+
+            var principal = handler.ValidateToken(
+                token,
+                new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = _configuration["Jwt:Issuer"],
+                    ValidAudience = _configuration["Jwt:Audience"],
+                    IssuerSigningKey = key
+                },
+                out _);
+
+            var purpose = principal.FindFirst("purpose")?.Value;
+            var userIdValue = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            return purpose == expectedPurpose &&
+                Guid.TryParse(userIdValue, out var userId)
+                    ? userId
+                    : null;
+        }
+        catch (Exception ex) when (ex is SecurityTokenException or ArgumentException)
+        {
+            return null;
         }
     }
 

@@ -96,6 +96,44 @@ public sealed class AxiForgeApiClient
     }
 
     /// <summary>
+    /// Confirms an AxiForge email address with a signed API token.
+    /// Returns true when the token is accepted and the account is marked confirmed.
+    /// </summary>
+    public async Task<bool> ConfirmEmailAsync(ConfirmEmailRequestDto request)
+    {
+        using var trace = FunctionTrace.Enter(_logger, nameof(AxiForgeApiClient), nameof(ConfirmEmailAsync));
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("api/auth/confirm-email", request);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            trace.Exception(ex);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Requests a new email-confirmation message for an AxiForge account.
+    /// Returns true when the API accepts the resend request.
+    /// </summary>
+    public async Task<bool> ResendEmailConfirmationAsync(ResendEmailConfirmationRequestDto request)
+    {
+        using var trace = FunctionTrace.Enter(_logger, nameof(AxiForgeApiClient), nameof(ResendEmailConfirmationAsync));
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("api/auth/resend-confirmation", request);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            trace.Exception(ex);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Exchanges an AxiPlus practice launch token for an AxiForge session.
     /// Returns authentication details so launched child accounts can continue without separate manual login.
     /// </summary>

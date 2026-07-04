@@ -7,15 +7,11 @@ namespace AxiPlus.Web.Services;
 
 public class MentorPortalApiService
 {
-    private readonly HttpClient _httpClient;
-    private readonly AuthService _authService;
+    private readonly AuthorizedApiClient _apiClient;
 
-    public MentorPortalApiService(
-        HttpClient httpClient,
-        AuthService authService)
+    public MentorPortalApiService(AuthorizedApiClient apiClient)
    {
-        _httpClient = httpClient;
-        _authService = authService;
+        _apiClient = apiClient;
     }
 
     public Task<MentorDashboardModel?> GetDashboardAsync()
@@ -156,136 +152,26 @@ public class MentorPortalApiService
 
     private async Task<List<T>> GetListAsync<T>(string url)
    {
-        var result = await GetAsync<List<T>>(url);
-
-        return result ?? new List<T>();
+        return await _apiClient.GetListAsync<T>(url);
     }
 
-    private async Task<T?> GetAsync<T>(string url)
+    private Task<T?> GetAsync<T>(string url)
    {
-        var request = await CreateAuthorizedRequestAsync(HttpMethod.Get, url);
-
-        if (request == null)
-       {
-            return default;
-        }
-
-        try
-       {
-            var response = await _httpClient.SendAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-           {
-                return default;
-            }
-
-        return await response.Content.ReadFromJsonAsync<T>();
-        }
-        catch (HttpRequestException)
-       {
-            return default;
-        }
-        catch (TaskCanceledException)
-       {
-            return default;
-        }
-        catch (NotSupportedException)
-       {
-            return default;
-        }
-        catch (JsonException)
-       {
-            return default;
-        }
+        return _apiClient.GetAsync<T>(url);
     }
 
-    private async Task<T?> PostAsync<T>(string url, object body)
+    private Task<T?> PostAsync<T>(string url, object body)
    {
-        var request = await CreateAuthorizedRequestAsync(HttpMethod.Post, url);
-
-        if (request == null)
-       {
-            return default;
-        }
-
-        request.Content = JsonContent.Create(body);
-
-        try
-       {
-            var response = await _httpClient.SendAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-           {
-                return default;
-            }
-
-            return await response.Content.ReadFromJsonAsync<T>();
-        }
-        catch (HttpRequestException)
-       {
-            return default;
-        }
-        catch (TaskCanceledException)
-       {
-            return default;
-        }
-        catch (NotSupportedException)
-       {
-            return default;
-        }
-        catch (JsonException)
-       {
-            return default;
-        }
+        return _apiClient.PostAsync<T>(url, body);
     }
 
     private async Task<List<T>> PostListAsync<T>(string url, object body)
    {
-        var result = await PostAsync<List<T>>(url, body);
-
-        return result ?? new List<T>();
+        return await _apiClient.PostListAsync<T>(url, body);
     }
 
-    private async Task<bool> DeleteAsync(string url)
+    private Task<bool> DeleteAsync(string url)
    {
-        var request = await CreateAuthorizedRequestAsync(HttpMethod.Delete, url);
-
-        if (request == null)
-       {
-            return false;
-        }
-
-        try
-       {
-            var response = await _httpClient.SendAsync(request);
-
-            return response.IsSuccessStatusCode;
-        }
-        catch (HttpRequestException)
-       {
-            return false;
-        }
-        catch (TaskCanceledException)
-       {
-            return false;
-        }
-    }
-
-    private async Task<HttpRequestMessage?> CreateAuthorizedRequestAsync(
-        HttpMethod method,
-        string url)
-   {
-        var token = await _authService.GetTokenAsync();
-
-        if (string.IsNullOrWhiteSpace(token))
-       {
-            return null;
-        }
-
-        var request = new HttpRequestMessage(method, url);
-        request.Headers.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
-
-        return request;
+        return _apiClient.SendAsync(HttpMethod.Delete, url);
     }
 }

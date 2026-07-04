@@ -5,15 +5,11 @@ namespace AxiPlus.Web.Services;
 
 public class StudentPortalApiService
 {
-    private readonly HttpClient _httpClient;
-    private readonly AuthService _authService;
+    private readonly AuthorizedApiClient _apiClient;
 
-    public StudentPortalApiService(
-        HttpClient httpClient,
-        AuthService authService)
+    public StudentPortalApiService(AuthorizedApiClient apiClient)
    {
-        _httpClient = httpClient;
-        _authService = authService;
+        _apiClient = apiClient;
     }
 
     public Task<List<StudentLiveClassModel>> GetLiveClassesAsync()
@@ -36,23 +32,9 @@ public class StudentPortalApiService
 
     public async Task<string?> CreatePracticeLaunchUrlAsync(Guid lessonId)
    {
-        var request = await CreateAuthorizedRequestAsync(
-            HttpMethod.Post,
-            $"api/practice-launch/lessons/{lessonId}");
-
-        if (request == null)
-       {
-            return null;
-        }
-
-        var response = await _httpClient.SendAsync(request);
-
-        if (!response.IsSuccessStatusCode)
-       {
-            return null;
-        }
-
-        var launch = await response.Content.ReadFromJsonAsync<PracticeLaunchResponseModel>();
+        var launch = await _apiClient.PostAsync<PracticeLaunchResponseModel>(
+            $"api/practice-launch/lessons/{lessonId}",
+            new { });
         return launch?.RedirectUrl;
     }
 
@@ -64,18 +46,9 @@ public class StudentPortalApiService
 
     public async Task<bool> MarkNotificationReadAsync(Guid id)
    {
-        var request = await CreateAuthorizedRequestAsync(
+        return await _apiClient.SendAsync(
             HttpMethod.Post,
             $"api/student-portal/notifications/{id}/read");
-
-        if (request == null)
-       {
-            return false;
-        }
-
-        var response = await _httpClient.SendAsync(request);
-
-        return response.IsSuccessStatusCode;
     }
 
     public Task<List<SupportTicketModel>> GetSupportTicketsAsync()
@@ -87,67 +60,14 @@ public class StudentPortalApiService
     public async Task<SupportTicketModel?> CreateSupportTicketAsync(
         CreateSupportTicketModel model)
    {
-        var request = await CreateAuthorizedRequestAsync(
-            HttpMethod.Post,
-            "api/student-portal/support-tickets");
-
-        if (request == null)
-       {
-            return null;
-        }
-
-        request.Content = JsonContent.Create(model);
-
-        var response = await _httpClient.SendAsync(request);
-
-        if (!response.IsSuccessStatusCode)
-       {
-            return null;
-        }
-
-        return await response.Content
-            .ReadFromJsonAsync<SupportTicketModel>();
+        return await _apiClient.PostAsync<SupportTicketModel>(
+            "api/student-portal/support-tickets",
+            model);
     }
 
     private async Task<List<T>> GetListAsync<T>(string url)
    {
-        var request = await CreateAuthorizedRequestAsync(
-            HttpMethod.Get,
-            url);
-
-        if (request == null)
-       {
-            return new List<T>();
-        }
-
-        var response = await _httpClient.SendAsync(request);
-
-        if (!response.IsSuccessStatusCode)
-       {
-            return new List<T>();
-        }
-
-        return await response.Content
-            .ReadFromJsonAsync<List<T>>()
-            ?? new List<T>();
-    }
-
-    private async Task<HttpRequestMessage?> CreateAuthorizedRequestAsync(
-        HttpMethod method,
-        string url)
-   {
-        var token = await _authService.GetTokenAsync();
-
-        if (string.IsNullOrWhiteSpace(token))
-       {
-            return null;
-        }
-
-        var request = new HttpRequestMessage(method, url);
-        request.Headers.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
-
-        return request;
+        return await _apiClient.GetListAsync<T>(url);
     }
 
     private sealed class PracticeLaunchResponseModel

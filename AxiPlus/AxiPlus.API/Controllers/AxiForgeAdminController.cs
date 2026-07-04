@@ -4,6 +4,7 @@ using AxiPlus.Infrastructure.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace AxiPlus.API.Controllers;
 
@@ -107,12 +108,14 @@ public sealed class AxiForgeAdminController : ControllerBase
             problem.Difficulty = string.IsNullOrWhiteSpace(dto.Difficulty) ? "Easy" : dto.Difficulty.Trim();
             problem.Topic = dto.Topic.Trim();
             problem.Tags = dto.Tags.Trim();
+            problem.ClassTags = dto.ClassTags.Trim();
+            problem.CompanyTags = dto.CompanyTags.Trim();
             problem.StarterCode = dto.StarterCode;
             problem.StarterCodeByLanguage = dto.StarterCodeByLanguage;
             problem.ExpectedOutput = dto.ExpectedOutput;
             problem.TimeLimitMilliseconds = Math.Max(100, dto.TimeLimitMilliseconds);
             problem.MemoryLimitKb = Math.Max(1024, dto.MemoryLimitKb);
-            problem.IsPublished = dto.IsPublished;
+            ApplyAuthoringState(problem, dto.IsPublished, dto.ApprovalStatus);
 
             problem.TestCases.Clear();
             foreach (var testCase in dto.TestCases.OrderBy(x => x.Order))
@@ -126,6 +129,7 @@ public sealed class AxiForgeAdminController : ControllerBase
                 });
             }
 
+            WriteAudit("CodingProblem", problem.Id, dto.Id.HasValue ? "SaveProblem" : "CreateProblem", problem.Title);
             await _context.SaveChangesAsync(cancellationToken);
             return Ok(ToProblemDto(problem));
         }
@@ -157,8 +161,9 @@ public sealed class AxiForgeAdminController : ControllerBase
             }
 
             problem.IsPublished = false;
+            problem.ApprovalStatus = "Archived";
+            WriteAudit("CodingProblem", id, "ArchiveProblem", problem.Title);
             await _context.SaveChangesAsync(cancellationToken);
-            WriteAudit("ArchiveProblem", id);
             return NoContent();
         }
         catch (Exception ex)
@@ -191,9 +196,9 @@ public sealed class AxiForgeAdminController : ControllerBase
                 return NotFound();
             }
 
+            WriteAudit("CodingProblem", id, "DeleteProblem", problem.Title);
             _context.CodingProblems.Remove(problem);
             await _context.SaveChangesAsync(cancellationToken);
-            WriteAudit("DeleteProblem", id);
             return NoContent();
         }
         catch (Exception ex)
@@ -270,7 +275,9 @@ public sealed class AxiForgeAdminController : ControllerBase
             roadmap.Slug = BuildSlug(dto.Slug, dto.Title);
             roadmap.Description = dto.Description.Trim();
             roadmap.Level = string.IsNullOrWhiteSpace(dto.Level) ? "Beginner" : dto.Level.Trim();
-            roadmap.IsPublished = dto.IsPublished;
+            roadmap.ClassTags = dto.ClassTags.Trim();
+            roadmap.CompanyTags = dto.CompanyTags.Trim();
+            ApplyAuthoringState(roadmap, dto.IsPublished, dto.ApprovalStatus);
 
             roadmap.Steps.Clear();
             foreach (var step in dto.Steps.OrderBy(x => x.Order))
@@ -283,6 +290,7 @@ public sealed class AxiForgeAdminController : ControllerBase
                 });
             }
 
+            WriteAudit("Roadmap", roadmap.Id, dto.Id.HasValue ? "SaveRoadmap" : "CreateRoadmap", roadmap.Title);
             await _context.SaveChangesAsync(cancellationToken);
             return Ok(ToRoadmapDto(roadmap));
         }
@@ -314,8 +322,9 @@ public sealed class AxiForgeAdminController : ControllerBase
             }
 
             roadmap.IsPublished = false;
+            roadmap.ApprovalStatus = "Archived";
+            WriteAudit("Roadmap", id, "ArchiveRoadmap", roadmap.Title);
             await _context.SaveChangesAsync(cancellationToken);
-            WriteAudit("ArchiveRoadmap", id);
             return NoContent();
         }
         catch (Exception ex)
@@ -348,9 +357,9 @@ public sealed class AxiForgeAdminController : ControllerBase
                 return NotFound();
             }
 
+            WriteAudit("Roadmap", id, "DeleteRoadmap", roadmap.Title);
             _context.RoadmapTemplates.Remove(roadmap);
             await _context.SaveChangesAsync(cancellationToken);
-            WriteAudit("DeleteRoadmap", id);
             return NoContent();
         }
         catch (Exception ex)
@@ -428,7 +437,9 @@ public sealed class AxiForgeAdminController : ControllerBase
             assessment.Description = dto.Description.Trim();
             assessment.DurationMinutes = Math.Max(1, dto.DurationMinutes);
             assessment.PassingScore = Math.Clamp(dto.PassingScore, 0, 100);
-            assessment.IsPublished = dto.IsPublished;
+            assessment.ClassTags = dto.ClassTags.Trim();
+            assessment.CompanyTags = dto.CompanyTags.Trim();
+            ApplyAuthoringState(assessment, dto.IsPublished, dto.ApprovalStatus);
 
             assessment.Questions.Clear();
             foreach (var question in dto.Questions.OrderBy(x => x.Order))
@@ -445,6 +456,7 @@ public sealed class AxiForgeAdminController : ControllerBase
                 });
             }
 
+            WriteAudit("Assessment", assessment.Id, dto.Id.HasValue ? "SaveAssessment" : "CreateAssessment", assessment.Title);
             await _context.SaveChangesAsync(cancellationToken);
             return Ok(ToAssessmentDto(assessment));
         }
@@ -476,8 +488,9 @@ public sealed class AxiForgeAdminController : ControllerBase
             }
 
             assessment.IsPublished = false;
+            assessment.ApprovalStatus = "Archived";
+            WriteAudit("Assessment", id, "ArchiveAssessment", assessment.Title);
             await _context.SaveChangesAsync(cancellationToken);
-            WriteAudit("ArchiveAssessment", id);
             return NoContent();
         }
         catch (Exception ex)
@@ -510,9 +523,9 @@ public sealed class AxiForgeAdminController : ControllerBase
                 return NotFound();
             }
 
+            WriteAudit("Assessment", id, "DeleteAssessment", assessment.Title);
             _context.AssessmentTemplates.Remove(assessment);
             await _context.SaveChangesAsync(cancellationToken);
-            WriteAudit("DeleteAssessment", id);
             return NoContent();
         }
         catch (Exception ex)
@@ -634,8 +647,8 @@ public sealed class AxiForgeAdminController : ControllerBase
 
             mapping.ProblemId = dto.ProblemId;
             mapping.SourceProduct = string.IsNullOrWhiteSpace(dto.SourceProduct) ? "AxiPlus" : dto.SourceProduct.Trim();
+            WriteAudit("LessonPracticeSet", mapping.Id, "SaveLessonMapping", $"{lesson.Title} -> {problem.Title}");
             await _context.SaveChangesAsync(cancellationToken);
-            WriteAudit("SaveLessonMapping", mapping.Id);
 
             return Ok(new AxiForgeLessonPracticeMappingDto(
                 mapping.Id,
@@ -672,9 +685,9 @@ public sealed class AxiForgeAdminController : ControllerBase
                 return NotFound();
             }
 
+            WriteAudit("LessonPracticeSet", id, "DeleteLessonMapping", mapping.SourceProduct);
             _context.LessonPracticeSets.Remove(mapping);
             await _context.SaveChangesAsync(cancellationToken);
-            WriteAudit("DeleteLessonMapping", id);
             return NoContent();
         }
         catch (Exception ex)
@@ -686,6 +699,159 @@ public sealed class AxiForgeAdminController : ControllerBase
         {
             Console.WriteLine("Exiting -> AxiPlus.API -> Controllers -> AxiForgeAdminController.cs -> DeleteLessonMapping");
         }
+    }
+
+    /// <summary>
+    /// Submits a draft content item for publish approval.
+    /// Returns no content after the item is removed from student visibility and marked pending.
+    /// </summary>
+    [HttpPost("{contentType}/{id:guid}/submit-approval")]
+    public async Task<IActionResult> SubmitForApproval(
+        string contentType,
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var changed = await UpdateApprovalStateAsync(
+            contentType,
+            id,
+            "PendingApproval",
+            string.Empty,
+            cancellationToken);
+
+        return changed ? NoContent() : NotFound();
+    }
+
+    /// <summary>
+    /// Approves a pending content item for student-facing publication.
+    /// Returns no content after the item is marked approved and published.
+    /// </summary>
+    [HttpPost("{contentType}/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveContent(
+        string contentType,
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var changed = await UpdateApprovalStateAsync(
+            contentType,
+            id,
+            "Approved",
+            string.Empty,
+            cancellationToken);
+
+        return changed ? NoContent() : NotFound();
+    }
+
+    /// <summary>
+    /// Rejects a pending content item and records the reason.
+    /// Returns no content after the item is hidden from student pages.
+    /// </summary>
+    [HttpPost("{contentType}/{id:guid}/reject")]
+    public async Task<IActionResult> RejectContent(
+        string contentType,
+        Guid id,
+        ApprovalActionRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var changed = await UpdateApprovalStateAsync(
+            contentType,
+            id,
+            "Rejected",
+            request.Reason ?? string.Empty,
+            cancellationToken);
+
+        return changed ? NoContent() : NotFound();
+    }
+
+    /// <summary>
+    /// Gets recent AxiForge admin audit entries.
+    /// Returns durable authoring history for admin review.
+    /// </summary>
+    [HttpGet("audit")]
+    public async Task<ActionResult<List<AxiForgeAdminAuditEntryDto>>> GetAudit(
+        CancellationToken cancellationToken)
+    {
+        var entries = await _context.AdminAuditEntries
+            .AsNoTracking()
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(100)
+            .Select(x => new AxiForgeAdminAuditEntryDto(
+                x.Id,
+                x.EntityType,
+                x.EntityId,
+                x.Action,
+                x.Summary,
+                x.ActorEmail,
+                x.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return Ok(entries);
+    }
+
+    /// <summary>
+    /// Gets class and company taxonomy values for AxiForge authoring.
+    /// Returns active and inactive values so admins can reuse consistent tags.
+    /// </summary>
+    [HttpGet("taxonomy")]
+    public async Task<ActionResult<List<AxiForgeTaxonomyItemDto>>> GetTaxonomy(
+        CancellationToken cancellationToken)
+    {
+        var items = await _context.TaxonomyItems
+            .AsNoTracking()
+            .OrderBy(x => x.Type)
+            .ThenBy(x => x.DisplayOrder)
+            .ThenBy(x => x.Name)
+            .Select(x => new AxiForgeTaxonomyItemDto(
+                x.Id,
+                x.Type,
+                x.Name,
+                x.Slug,
+                x.IsActive,
+                x.DisplayOrder))
+            .ToListAsync(cancellationToken);
+
+        return Ok(items);
+    }
+
+    /// <summary>
+    /// Creates or updates a class/company taxonomy item.
+    /// Returns the saved taxonomy item for immediate use in authoring forms.
+    /// </summary>
+    [HttpPost("taxonomy")]
+    public async Task<ActionResult<AxiForgeTaxonomyItemDto>> SaveTaxonomy(
+        SaveAxiForgeTaxonomyItemDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Name))
+        {
+            return BadRequest("Taxonomy name is required.");
+        }
+
+        var taxonomyType = NormalizeTaxonomyType(dto.Type);
+        var item = dto.Id.HasValue
+            ? await _context.TaxonomyItems.FirstOrDefaultAsync(x => x.Id == dto.Id.Value, cancellationToken)
+            : null;
+
+        if (item == null)
+        {
+            item = new AxiForgeTaxonomyItem();
+            _context.TaxonomyItems.Add(item);
+        }
+
+        item.Type = taxonomyType;
+        item.Name = dto.Name.Trim();
+        item.Slug = BuildSlug(dto.Slug, dto.Name);
+        item.IsActive = dto.IsActive;
+        item.DisplayOrder = dto.DisplayOrder;
+        WriteAudit("Taxonomy", item.Id, dto.Id.HasValue ? "SaveTaxonomy" : "CreateTaxonomy", $"{item.Type}:{item.Name}");
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return Ok(new AxiForgeTaxonomyItemDto(
+            item.Id,
+            item.Type,
+            item.Name,
+            item.Slug,
+            item.IsActive,
+            item.DisplayOrder));
     }
 
     /// <summary>
@@ -741,12 +907,15 @@ public sealed class AxiForgeAdminController : ControllerBase
                     problem.Difficulty,
                     problem.Topic,
                     problem.Tags,
+                    problem.ClassTags,
+                    problem.CompanyTags,
                     problem.StarterCode,
                     problem.StarterCodeByLanguage,
                     problem.ExpectedOutput,
                     problem.TimeLimitMilliseconds,
                     problem.MemoryLimitKb,
                     problem.IsPublished,
+                    problem.ApprovalStatus,
                     problem.TestCases.Select(x => new SaveAxiForgeTestCaseDto(x.Input, x.ExpectedOutput, x.IsHidden, x.Order)).ToList()), cancellationToken);
             }
 
@@ -758,7 +927,10 @@ public sealed class AxiForgeAdminController : ControllerBase
                     roadmap.Title,
                     roadmap.Description,
                     roadmap.Level,
+                    roadmap.ClassTags,
+                    roadmap.CompanyTags,
                     roadmap.IsPublished,
+                    roadmap.ApprovalStatus,
                     roadmap.Steps.Select(x => new SaveAxiForgeRoadmapStepDto(x.Title, x.Description, x.Order)).ToList()), cancellationToken);
             }
 
@@ -771,11 +943,15 @@ public sealed class AxiForgeAdminController : ControllerBase
                     assessment.Description,
                     assessment.DurationMinutes,
                     assessment.PassingScore,
+                    assessment.ClassTags,
+                    assessment.CompanyTags,
                     assessment.IsPublished,
+                    assessment.ApprovalStatus,
                     assessment.Questions.Select(x => new SaveAxiForgeQuestionDto(x.Prompt, x.OptionA, x.OptionB, x.OptionC, x.OptionD, x.CorrectOption, x.Order)).ToList()), cancellationToken);
             }
 
-            WriteAudit("ImportContent", Guid.Empty);
+            WriteAudit("ImportBundle", null, "ImportContent", "Imported AxiForge authoring bundle");
+            await _context.SaveChangesAsync(cancellationToken);
             return NoContent();
         }
         catch (Exception ex)
@@ -841,6 +1017,143 @@ public sealed class AxiForgeAdminController : ControllerBase
         }
     }
 
+    private static string NormalizeTaxonomyType(string taxonomyType)
+    {
+        var normalized = taxonomyType.Trim();
+        return normalized.Equals("Company", StringComparison.OrdinalIgnoreCase)
+            ? "Company"
+            : "Class";
+    }
+
+    private static void ApplyAuthoringState(
+        CodingProblem problem,
+        bool requestedPublish,
+        string? requestedApprovalStatus)
+    {
+        var approvalStatus = NormalizeApprovalStatus(requestedApprovalStatus, requestedPublish);
+        problem.ApprovalStatus = approvalStatus;
+        problem.IsPublished = requestedPublish && approvalStatus == "Approved";
+        if (approvalStatus == "PendingApproval")
+        {
+            problem.SubmittedForApprovalAt ??= DateTime.UtcNow;
+        }
+    }
+
+    private static void ApplyAuthoringState(
+        RoadmapTemplate roadmap,
+        bool requestedPublish,
+        string? requestedApprovalStatus)
+    {
+        var approvalStatus = NormalizeApprovalStatus(requestedApprovalStatus, requestedPublish);
+        roadmap.ApprovalStatus = approvalStatus;
+        roadmap.IsPublished = requestedPublish && approvalStatus == "Approved";
+        if (approvalStatus == "PendingApproval")
+        {
+            roadmap.SubmittedForApprovalAt ??= DateTime.UtcNow;
+        }
+    }
+
+    private static void ApplyAuthoringState(
+        AssessmentTemplate assessment,
+        bool requestedPublish,
+        string? requestedApprovalStatus)
+    {
+        var approvalStatus = NormalizeApprovalStatus(requestedApprovalStatus, requestedPublish);
+        assessment.ApprovalStatus = approvalStatus;
+        assessment.IsPublished = requestedPublish && approvalStatus == "Approved";
+        if (approvalStatus == "PendingApproval")
+        {
+            assessment.SubmittedForApprovalAt ??= DateTime.UtcNow;
+        }
+    }
+
+    private static string NormalizeApprovalStatus(string? status, bool requestedPublish)
+    {
+        if (requestedPublish && string.IsNullOrWhiteSpace(status))
+        {
+            return "PendingApproval";
+        }
+
+        return status?.Trim() switch
+        {
+            "Approved" => "Approved",
+            "PendingApproval" => "PendingApproval",
+            "Rejected" => "Rejected",
+            "Archived" => "Archived",
+            _ => requestedPublish ? "PendingApproval" : "Draft"
+        };
+    }
+
+    private async Task<bool> UpdateApprovalStateAsync(
+        string contentType,
+        Guid id,
+        string status,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var actorEmail = GetActorEmail();
+        var now = DateTime.UtcNow;
+
+        if (contentType.Equals("problems", StringComparison.OrdinalIgnoreCase))
+        {
+            var problem = await _context.CodingProblems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (problem == null)
+            {
+                return false;
+            }
+
+            problem.ApprovalStatus = status;
+            problem.IsPublished = status == "Approved";
+            problem.RejectionReason = status == "Rejected" ? reason.Trim() : string.Empty;
+            problem.SubmittedForApprovalAt = status == "PendingApproval" ? now : problem.SubmittedForApprovalAt;
+            problem.ApprovedAt = status == "Approved" ? now : problem.ApprovedAt;
+            problem.ApprovedBy = status == "Approved" ? actorEmail : problem.ApprovedBy;
+            WriteAudit("CodingProblem", problem.Id, status, problem.Title);
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        if (contentType.Equals("roadmaps", StringComparison.OrdinalIgnoreCase))
+        {
+            var roadmap = await _context.RoadmapTemplates.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (roadmap == null)
+            {
+                return false;
+            }
+
+            roadmap.ApprovalStatus = status;
+            roadmap.IsPublished = status == "Approved";
+            roadmap.RejectionReason = status == "Rejected" ? reason.Trim() : string.Empty;
+            roadmap.SubmittedForApprovalAt = status == "PendingApproval" ? now : roadmap.SubmittedForApprovalAt;
+            roadmap.ApprovedAt = status == "Approved" ? now : roadmap.ApprovedAt;
+            roadmap.ApprovedBy = status == "Approved" ? actorEmail : roadmap.ApprovedBy;
+            WriteAudit("Roadmap", roadmap.Id, status, roadmap.Title);
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        if (contentType.Equals("assessments", StringComparison.OrdinalIgnoreCase))
+        {
+            var assessment = await _context.AssessmentTemplates.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (assessment == null)
+            {
+                return false;
+            }
+
+            assessment.ApprovalStatus = status;
+            assessment.IsPublished = status == "Approved";
+            assessment.RejectionReason = status == "Rejected" ? reason.Trim() : string.Empty;
+            assessment.SubmittedForApprovalAt = status == "PendingApproval" ? now : assessment.SubmittedForApprovalAt;
+            assessment.ApprovedAt = status == "Approved" ? now : assessment.ApprovedAt;
+            assessment.ApprovedBy = status == "Approved" ? actorEmail : assessment.ApprovedBy;
+            WriteAudit("Assessment", assessment.Id, status, assessment.Title);
+            await _context.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
+        return false;
+    }
+
     private static AxiForgeAdminProblemDto ToProblemDto(CodingProblem problem)
     {
         Console.WriteLine("Entering -> AxiPlus.API -> Controllers -> AxiForgeAdminController.cs -> ToProblemDto");
@@ -859,12 +1172,19 @@ public sealed class AxiForgeAdminController : ControllerBase
                 problem.Difficulty,
                 problem.Topic,
                 problem.Tags,
+                problem.ClassTags,
+                problem.CompanyTags,
                 problem.StarterCode,
                 problem.StarterCodeByLanguage,
                 problem.ExpectedOutput,
                 problem.TimeLimitMilliseconds,
                 problem.MemoryLimitKb,
                 problem.IsPublished,
+                problem.ApprovalStatus,
+                problem.SubmittedForApprovalAt,
+                problem.ApprovedAt,
+                problem.ApprovedBy,
+                problem.RejectionReason,
                 problem.TestCases.OrderBy(x => x.Order).Select(x =>
                     new AxiForgeAdminTestCaseDto(x.Id, x.Input, x.ExpectedOutput, x.IsHidden, x.Order)).ToList());
         }
@@ -890,7 +1210,14 @@ public sealed class AxiForgeAdminController : ControllerBase
                 roadmap.Title,
                 roadmap.Description,
                 roadmap.Level,
+                roadmap.ClassTags,
+                roadmap.CompanyTags,
                 roadmap.IsPublished,
+                roadmap.ApprovalStatus,
+                roadmap.SubmittedForApprovalAt,
+                roadmap.ApprovedAt,
+                roadmap.ApprovedBy,
+                roadmap.RejectionReason,
                 roadmap.Steps.OrderBy(x => x.Order).Select(x =>
                     new AxiForgeAdminRoadmapStepDto(x.Id, x.Title, x.Description, x.Order)).ToList());
         }
@@ -917,7 +1244,14 @@ public sealed class AxiForgeAdminController : ControllerBase
                 assessment.Description,
                 assessment.DurationMinutes,
                 assessment.PassingScore,
+                assessment.ClassTags,
+                assessment.CompanyTags,
                 assessment.IsPublished,
+                assessment.ApprovalStatus,
+                assessment.SubmittedForApprovalAt,
+                assessment.ApprovedAt,
+                assessment.ApprovedBy,
+                assessment.RejectionReason,
                 assessment.Questions.OrderBy(x => x.Order).Select(x =>
                     new AxiForgeAdminQuestionDto(
                         x.Id,
@@ -940,12 +1274,22 @@ public sealed class AxiForgeAdminController : ControllerBase
         }
     }
 
-    private static void WriteAudit(string action, Guid entityId)
+    private void WriteAudit(string entityType, Guid? entityId, string action, string summary)
     {
         Console.WriteLine("Entering -> AxiPlus.API -> Controllers -> AxiForgeAdminController.cs -> WriteAudit");
         try
         {
-            Console.WriteLine($"AUDIT -> AxiPlus.API -> AxiForgeAdmin -> {action} -> EntityId:{entityId} -> Utc:{DateTime.UtcNow:o}");
+            _context.AdminAuditEntries.Add(new AxiForgeAdminAuditEntry
+            {
+                EntityType = entityType,
+                EntityId = entityId,
+                Action = action,
+                Summary = summary,
+                ActorEmail = GetActorEmail(),
+                CreatedAt = DateTime.UtcNow
+            });
+
+            Console.WriteLine($"AUDIT -> AxiPlus.API -> AxiForgeAdmin -> {action} -> Entity:{entityType}:{entityId} -> Utc:{DateTime.UtcNow:o}");
         }
         catch (Exception ex)
         {
@@ -957,6 +1301,11 @@ public sealed class AxiForgeAdminController : ControllerBase
             Console.WriteLine("Exiting -> AxiPlus.API -> Controllers -> AxiForgeAdminController.cs -> WriteAudit");
         }
     }
+
+    private string GetActorEmail() =>
+        User.FindFirstValue(ClaimTypes.Email) ??
+        User.Identity?.Name ??
+        "system";
 }
 
 public sealed record AxiForgeAdminProblemDto(
@@ -972,12 +1321,19 @@ public sealed record AxiForgeAdminProblemDto(
     string Difficulty,
     string Topic,
     string Tags,
+    string ClassTags,
+    string CompanyTags,
     string StarterCode,
     string StarterCodeByLanguage,
     string ExpectedOutput,
     int TimeLimitMilliseconds,
     int MemoryLimitKb,
     bool IsPublished,
+    string ApprovalStatus,
+    DateTime? SubmittedForApprovalAt,
+    DateTime? ApprovedAt,
+    string ApprovedBy,
+    string RejectionReason,
     List<AxiForgeAdminTestCaseDto> TestCases);
 
 public sealed record SaveAxiForgeProblemDto(
@@ -993,12 +1349,15 @@ public sealed record SaveAxiForgeProblemDto(
     string Difficulty,
     string Topic,
     string Tags,
+    string ClassTags,
+    string CompanyTags,
     string StarterCode,
     string StarterCodeByLanguage,
     string ExpectedOutput,
     int TimeLimitMilliseconds,
     int MemoryLimitKb,
     bool IsPublished,
+    string ApprovalStatus,
     List<SaveAxiForgeTestCaseDto> TestCases);
 
 public sealed record AxiForgeAdminTestCaseDto(
@@ -1020,7 +1379,14 @@ public sealed record AxiForgeAdminRoadmapDto(
     string Title,
     string Description,
     string Level,
+    string ClassTags,
+    string CompanyTags,
     bool IsPublished,
+    string ApprovalStatus,
+    DateTime? SubmittedForApprovalAt,
+    DateTime? ApprovedAt,
+    string ApprovedBy,
+    string RejectionReason,
     List<AxiForgeAdminRoadmapStepDto> Steps);
 
 public sealed record SaveAxiForgeRoadmapDto(
@@ -1029,7 +1395,10 @@ public sealed record SaveAxiForgeRoadmapDto(
     string Title,
     string Description,
     string Level,
+    string ClassTags,
+    string CompanyTags,
     bool IsPublished,
+    string ApprovalStatus,
     List<SaveAxiForgeRoadmapStepDto> Steps);
 
 public sealed record AxiForgeAdminRoadmapStepDto(
@@ -1050,7 +1419,14 @@ public sealed record AxiForgeAdminAssessmentDto(
     string Description,
     int DurationMinutes,
     int PassingScore,
+    string ClassTags,
+    string CompanyTags,
     bool IsPublished,
+    string ApprovalStatus,
+    DateTime? SubmittedForApprovalAt,
+    DateTime? ApprovedAt,
+    string ApprovedBy,
+    string RejectionReason,
     List<AxiForgeAdminQuestionDto> Questions);
 
 public sealed record SaveAxiForgeAssessmentDto(
@@ -1060,7 +1436,10 @@ public sealed record SaveAxiForgeAssessmentDto(
     string Description,
     int DurationMinutes,
     int PassingScore,
+    string ClassTags,
+    string CompanyTags,
     bool IsPublished,
+    string ApprovalStatus,
     List<SaveAxiForgeQuestionDto> Questions);
 
 public sealed record AxiForgeAdminQuestionDto(
@@ -1105,3 +1484,30 @@ public sealed record AxiForgeAdminImportExportDto(
     List<AxiForgeAdminProblemDto> Problems,
     List<AxiForgeAdminRoadmapDto> Roadmaps,
     List<AxiForgeAdminAssessmentDto> Assessments);
+
+public sealed record ApprovalActionRequestDto(string? Reason);
+
+public sealed record AxiForgeAdminAuditEntryDto(
+    Guid Id,
+    string EntityType,
+    Guid? EntityId,
+    string Action,
+    string Summary,
+    string ActorEmail,
+    DateTime CreatedAt);
+
+public sealed record AxiForgeTaxonomyItemDto(
+    Guid Id,
+    string Type,
+    string Name,
+    string Slug,
+    bool IsActive,
+    int DisplayOrder);
+
+public sealed record SaveAxiForgeTaxonomyItemDto(
+    Guid? Id,
+    string Type,
+    string Name,
+    string? Slug,
+    bool IsActive,
+    int DisplayOrder);

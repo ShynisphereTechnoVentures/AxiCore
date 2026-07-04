@@ -1,0 +1,48 @@
+@page "/confirm-email"
+@using AxiForge.Application.DTOs.Auth
+@inject AxiForge.Web.Services.AxiForgeApiClient ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Confirm Email</PageTitle>
+
+<section class="auth-page forge-auth-page">
+    <div class="auth-card forge-auth-card">
+        <p class="eyebrow">Email Confirmation</p>
+        <h2>@title</h2>
+        <p class="auth-copy">@message</p>
+        <a class="auth-link-button" href="/login">Back to login</a>
+    </div>
+</section>
+
+@code {
+    private string title = "Checking confirmation";
+    private string message = "Please wait while we confirm your email.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = GetToken();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            title = "Confirmation link is missing";
+            message = "Request a fresh confirmation email from the login page.";
+            return;
+        }
+
+        var confirmed = await ApiClient.ConfirmEmailAsync(new ConfirmEmailRequestDto
+        {
+            Token = token
+        });
+
+        title = confirmed ? "Email confirmed" : "Confirmation failed";
+        message = confirmed
+            ? "Your AxiForge email is confirmed."
+            : "This confirmation link is invalid or expired.";
+    }
+
+    private string GetToken()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        return query.TryGetValue("token", out var token) ? token.ToString() : string.Empty;
+    }
+}

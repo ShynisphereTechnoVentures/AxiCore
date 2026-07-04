@@ -74,6 +74,9 @@
             <button type="button" class="auth-link-button" @onclick="() => SetMode(AuthMode.Reset)" disabled="@isBusy">
                 Forgot password?
             </button>
+            <button type="button" class="auth-link-button" @onclick="ResendConfirmationAsync" disabled="@isBusy">
+                Resend confirmation
+            </button>
         </div>
     </div>
 </section>
@@ -204,6 +207,46 @@
         finally
         {
             Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Login.razor -> RequestPasswordResetAsync");
+        }
+    }
+
+    /// <summary>
+    /// Requests a new email-confirmation message for the entered email address.
+    /// Returns no value because the page shows safe resend feedback.
+    /// </summary>
+    private async Task ResendConfirmationAsync()
+    {
+        Console.WriteLine("Entering -> AxiForge.Web -> Components/Pages -> Login.razor -> ResendConfirmationAsync");
+        try
+        {
+            isBusy = true;
+            errorMessage = string.Empty;
+            successMessage = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(loginModel.Email))
+            {
+                errorMessage = "Enter your email before requesting confirmation.";
+                return;
+            }
+
+            var requested = await ApiClient.ResendEmailConfirmationAsync(new ResendEmailConfirmationRequestDto
+            {
+                Email = loginModel.Email
+            });
+
+            successMessage = requested
+                ? $"If {loginModel.Email} has AxiForge access, a confirmation link has been sent."
+                : "Confirmation request failed. Please try again.";
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception -> AxiForge.Web -> Components/Pages -> Login.razor -> ResendConfirmationAsync -> {ex.Message}");
+            errorMessage = "Confirmation request failed. Please try again.";
+        }
+        finally
+        {
+            isBusy = false;
+            Console.WriteLine("Exiting -> AxiForge.Web -> Components/Pages -> Login.razor -> ResendConfirmationAsync");
         }
     }
 

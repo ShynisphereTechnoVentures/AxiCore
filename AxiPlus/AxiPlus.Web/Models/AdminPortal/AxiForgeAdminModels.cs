@@ -14,12 +14,19 @@ public sealed class AxiForgeAdminProblemModel
     public string Difficulty { get; set; } = "Easy";
     public string Topic { get; set; } = string.Empty;
     public string Tags { get; set; } = string.Empty;
+    public string ClassTags { get; set; } = string.Empty;
+    public string CompanyTags { get; set; } = string.Empty;
     public string StarterCode { get; set; } = string.Empty;
     public string StarterCodeByLanguage { get; set; } = string.Empty;
     public string ExpectedOutput { get; set; } = string.Empty;
     public int TimeLimitMilliseconds { get; set; } = 1000;
     public int MemoryLimitKb { get; set; } = 262144;
     public bool IsPublished { get; set; } = true;
+    public string ApprovalStatus { get; set; } = "Approved";
+    public DateTime? SubmittedForApprovalAt { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public string ApprovedBy { get; set; } = string.Empty;
+    public string RejectionReason { get; set; } = string.Empty;
     public List<AxiForgeAdminTestCaseModel> TestCases { get; set; } = new();
 }
 
@@ -46,12 +53,15 @@ public sealed class SaveAxiForgeProblemModel
     public string Difficulty { get; set; } = "Easy";
     public string Topic { get; set; } = string.Empty;
     public string Tags { get; set; } = string.Empty;
+    public string ClassTags { get; set; } = string.Empty;
+    public string CompanyTags { get; set; } = string.Empty;
     public string StarterCode { get; set; } = string.Empty;
     public string StarterCodeByLanguage { get; set; } = string.Empty;
     public string ExpectedOutput { get; set; } = string.Empty;
     public int TimeLimitMilliseconds { get; set; } = 1000;
     public int MemoryLimitKb { get; set; } = 262144;
     public bool IsPublished { get; set; } = true;
+    public string ApprovalStatus { get; set; } = "Draft";
     public List<SaveAxiForgeTestCaseModel> TestCases { get; set; } = new();
 }
 
@@ -70,7 +80,14 @@ public sealed class AxiForgeAdminRoadmapModel
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Level { get; set; } = "Beginner";
+    public string ClassTags { get; set; } = string.Empty;
+    public string CompanyTags { get; set; } = string.Empty;
     public bool IsPublished { get; set; } = true;
+    public string ApprovalStatus { get; set; } = "Approved";
+    public DateTime? SubmittedForApprovalAt { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public string ApprovedBy { get; set; } = string.Empty;
+    public string RejectionReason { get; set; } = string.Empty;
     public List<AxiForgeAdminRoadmapStepModel> Steps { get; set; } = new();
 }
 
@@ -89,7 +106,10 @@ public sealed class SaveAxiForgeRoadmapModel
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string Level { get; set; } = "Beginner";
+    public string ClassTags { get; set; } = string.Empty;
+    public string CompanyTags { get; set; } = string.Empty;
     public bool IsPublished { get; set; } = true;
+    public string ApprovalStatus { get; set; } = "Draft";
     public List<SaveAxiForgeRoadmapStepModel> Steps { get; set; } = new();
 }
 
@@ -108,7 +128,14 @@ public sealed class AxiForgeAdminAssessmentModel
     public string Description { get; set; } = string.Empty;
     public int DurationMinutes { get; set; } = 30;
     public int PassingScore { get; set; } = 70;
+    public string ClassTags { get; set; } = string.Empty;
+    public string CompanyTags { get; set; } = string.Empty;
     public bool IsPublished { get; set; } = true;
+    public string ApprovalStatus { get; set; } = "Approved";
+    public DateTime? SubmittedForApprovalAt { get; set; }
+    public DateTime? ApprovedAt { get; set; }
+    public string ApprovedBy { get; set; } = string.Empty;
+    public string RejectionReason { get; set; } = string.Empty;
     public List<AxiForgeAdminQuestionModel> Questions { get; set; } = new();
 }
 
@@ -132,7 +159,10 @@ public sealed class SaveAxiForgeAssessmentModel
     public string Description { get; set; } = string.Empty;
     public int DurationMinutes { get; set; } = 30;
     public int PassingScore { get; set; } = 70;
+    public string ClassTags { get; set; } = string.Empty;
+    public string CompanyTags { get; set; } = string.Empty;
     public bool IsPublished { get; set; } = true;
+    public string ApprovalStatus { get; set; } = "Draft";
     public List<SaveAxiForgeQuestionModel> Questions { get; set; } = new();
 }
 
@@ -177,4 +207,40 @@ public sealed class AxiForgeAdminImportExportModel
     public List<AxiForgeAdminProblemModel> Problems { get; set; } = new();
     public List<AxiForgeAdminRoadmapModel> Roadmaps { get; set; } = new();
     public List<AxiForgeAdminAssessmentModel> Assessments { get; set; } = new();
+}
+
+public sealed class AxiForgeAdminAuditEntryModel
+{
+    public Guid Id { get; set; }
+    public string EntityType { get; set; } = string.Empty;
+    public Guid? EntityId { get; set; }
+    public string Action { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string ActorEmail { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}
+
+public sealed class AxiForgeTaxonomyItemModel
+{
+    public Guid Id { get; set; }
+    public string Type { get; set; } = "Class";
+    public string Name { get; set; } = string.Empty;
+    public string Slug { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
+    public int DisplayOrder { get; set; }
+}
+
+public sealed class SaveAxiForgeTaxonomyItemModel
+{
+    public Guid? Id { get; set; }
+    public string Type { get; set; } = "Class";
+    public string Name { get; set; } = string.Empty;
+    public string? Slug { get; set; }
+    public bool IsActive { get; set; } = true;
+    public int DisplayOrder { get; set; }
+}
+
+public sealed class AxiForgeApprovalActionModel
+{
+    public string? Reason { get; set; }
 }
